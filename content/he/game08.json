@@ -1,0 +1,162 @@
+{
+  "id": "game08",
+  "kind": "crane",
+  "title": "מנוף המכולות",
+  "story": "מעמיסים ומפרקים מכולות בסדר הנכון. עטיפה פנימית קודם, חיצונית אחרונה.",
+  "levels": {
+    "easy": {
+      "rounds": 8,
+      "lives": 4,
+      "timer": 0,
+      "mix": [
+        "wrap",
+        "layer",
+        "port"
+      ],
+      "pass": 6
+    },
+    "medium": {
+      "rounds": 10,
+      "lives": 3,
+      "timer": 16,
+      "mix": [
+        "wrap",
+        "peel",
+        "layer",
+        "port"
+      ],
+      "pass": 8
+    },
+    "hard": {
+      "rounds": 12,
+      "lives": 3,
+      "timer": 11,
+      "mix": [
+        "wrap",
+        "peel",
+        "layer",
+        "port",
+        "has"
+      ],
+      "pass": 10
+    }
+  },
+  "pdus": [
+    "Data",
+    "Segment",
+    "Packet",
+    "Frame",
+    "Bits"
+  ],
+  "layerOptions": [
+    {
+      "id": "app",
+      "label": "אפליקציה"
+    },
+    {
+      "id": "transport",
+      "label": "תעבורה"
+    },
+    {
+      "id": "internet",
+      "label": "אינטרנט"
+    },
+    {
+      "id": "access",
+      "label": "גישה לרשת"
+    }
+  ],
+  "layer": [
+    {
+      "text": "HTTP",
+      "answer": "app"
+    },
+    {
+      "text": "DNS",
+      "answer": "app"
+    },
+    {
+      "text": "TCP",
+      "answer": "transport"
+    },
+    {
+      "text": "UDP",
+      "answer": "transport"
+    },
+    {
+      "text": "IP",
+      "answer": "internet"
+    },
+    {
+      "text": "כתובת IP",
+      "answer": "internet"
+    },
+    {
+      "text": "Ethernet",
+      "answer": "access"
+    },
+    {
+      "text": "כתובת MAC",
+      "answer": "access"
+    },
+    {
+      "text": "SMTP",
+      "answer": "app"
+    },
+    {
+      "text": "פורט יעד",
+      "answer": "transport"
+    }
+  ],
+  "port": [
+    {
+      "text": "80",
+      "answer": "HTTP"
+    },
+    {
+      "text": "53",
+      "answer": "DNS"
+    },
+    {
+      "text": "21",
+      "answer": "FTP"
+    },
+    {
+      "text": "25",
+      "answer": "SMTP"
+    },
+    {
+      "text": "22",
+      "answer": "SSH"
+    }
+  ],
+  "portOptions": [
+    "HTTP",
+    "DNS",
+    "FTP",
+    "SMTP",
+    "SSH"
+  ],
+  "has": [
+    {
+      "text": "ביחידה יש כתובות IP אבל עדיין אין MAC",
+      "answer": "Packet"
+    },
+    {
+      "text": "ביחידה יש MAC ו-FCS",
+      "answer": "Frame"
+    },
+    {
+      "text": "ביחידה יש פורט מקור ופורט יעד",
+      "answer": "Segment"
+    },
+    {
+      "text": "ביחידה יש רק אפסים ואחדות באוויר",
+      "answer": "Bits"
+    },
+    {
+      "text": "ביחידה יש רק את המידע עצמו",
+      "answer": "Data"
+    }
+  ]
+}

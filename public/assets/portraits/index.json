@@ -1,0 +1,53 @@
+{
+ "moods": [
+  "neutral",
+  "happy",
+  "worried",
+  "surprised"
+ ],
+ "who": {
+  "naama": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "bit": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "uri": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "talia": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "barak": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "hero_girl": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "hero_boy": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ]
+ },
+ "note": "512x512 transparent busts, body turned ~24 deg to the viewer's left (flipX to face right)"
+}

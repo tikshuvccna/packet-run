@@ -1,0 +1,114 @@
+{
+  "id": "quiz08",
+  "title": "מכולות בתוך מכולות",
+  "pass": 5,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "mcq",
+      "q": "שכבות 7, 6 ו-5 של OSI הן ב-TCP/IP שכבת...",
+      "options": [
+        "גישה לרשת",
+        "תעבורה",
+        "אינטרנט",
+        "אפליקציה"
+      ],
+      "correct": 3,
+      "explain": "אפליקציה."
+    },
+    {
+      "id": "q2",
+      "type": "mcq",
+      "q": "שכבת הרשת (3) של OSI נקראת ב-TCP/IP...",
+      "options": [
+        "אינטרנט",
+        "אפליקציה",
+        "תעבורה",
+        "גישה"
+      ],
+      "correct": 0,
+      "explain": "אינטרנט."
+    },
+    {
+      "id": "q3",
+      "type": "tf",
+      "q": "UDP מוודא שכל המידע הגיע בשלמותו.",
+      "options": [
+        "נכון",
+        "לא נכון"
+      ],
+      "correct": 1,
+      "explain": "זה TCP. UDP מהיר וללא בדיקה."
+    },
+    {
+      "id": "q4",
+      "type": "mcq",
+      "q": "באיזה פורט עובד HTTP (אתרים)?",
+      "options": [
+        "53",
+        "21",
+        "80",
+        "25"
+      ],
+      "correct": 2,
+      "explain": "80."
+    },
+    {
+      "id": "q5",
+      "type": "mcq",
+      "q": "איך נקראת יחידת המידע בשכבת התעבורה?",
+      "options": [
+        "Segment",
+        "Packet",
+        "Frame",
+        "Bits"
+      ],
+      "correct": 0,
+      "explain": "Segment."
+    },
+    {
+      "id": "q6",
+      "type": "mcq",
+      "q": "מה יש במסגרת ואין בפאקטה?",
+      "options": [
+        "פורט מקור ויעד",
+        "כתובות IP",
+        "כתובות MAC ו-FCS",
+        "הנתונים עצמם"
+      ],
+      "correct": 2,
+      "explain": "MAC ו-FCS נוספים במסגרת."
+    },
+    {
+      "id": "q7",
+      "type": "mcq",
+      "q": "משחק רשת מהיר בזמן אמת. איזה פרוטוקול תעבורה?",
+      "options": [
+        "UDP",
+        "TCP",
+        "FTP",
+        "HTTP"
+      ],
+      "correct": 0,
+      "explain": "UDP, כי המהירות חשובה."
+    },
+    {
+      "id": "q8",
+      "type": "order",
+      "q": "סדרו את הכימוס מההתחלה",
+      "options": [
+        "Data",
+        "Segment",
+        "Packet",
+        "Frame"
+      ],
+      "correct": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "explain": "Data, Segment, Packet, Frame."
+    }
+  ]
+}
