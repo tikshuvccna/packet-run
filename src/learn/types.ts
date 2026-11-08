@@ -11,7 +11,13 @@ export type Widget =
   | { type: 'split'; title: string; total: number; capacities: number[]; unit: string }
   | { type: 'beam'; title: string; ships: number; modes: { id: string; label: string; count: number; text: string }[] }
   | { type: 'sort'; title: string; buckets: { id: string; label: string }[]; items: { label: string; bucket: string; why: string }[] }
-  | { type: 'wrap'; title: string; core: string; layers: { label: string; adds: string }[] };
+  | { type: 'wrap'; title: string; core: string; layers: { label: string; adds: string }[] }
+  | { type: 'msglab'; title: string; message: string }
+  | { type: 'encode'; title: string; words: string[] }
+  | { type: 'cast'; title: string; hosts: number }
+  | { type: 'flowsim'; title: string; cap: number; buf: number; secs: number }
+  | { type: 'journey'; title: string; core: string; layers: { label: string; adds: string; detail: string }[] }
+  | { type: 'tcpudp'; title: string; total: number };
 
 export interface LessonStep { id: string; title: string; html: string; widget: Widget; check: Check }
 export interface LessonData {

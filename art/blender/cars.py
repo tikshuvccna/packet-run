@@ -677,6 +677,13 @@ def car_super():
         body.box((0.03, 0.36, 0.16), loc=(k * 0.3, -2.26, 0.3), mat='Rubber')
     mirrors(body, bvh, 0.62, 0.78, cab, cap='Trim', arm='Trim')
     exhaust(body, 0, -2.3, 0.46, r=0.07)
+    # roof air-box scoop + rear fins (super-only silhouette cues)
+    z = cab.z_at(-0.55, 0)
+    body.box((0.34, 0.9, 0.22), loc=(0, -0.75, z + 0.06), mat='Trim', bevel=0.06, taper=(0.75, 1.0, -0.1))
+    body.box((0.24, 0.06, 0.14), loc=(0, -0.3, z + 0.1), mat='Rubber', bevel=0.02)
+    for s in (-1, 1):
+        body.box((0.06, 0.8, 0.26), loc=(s * 0.72, -1.85, 0.98), mat='Trim', bevel=0.02, taper=(1.0, 0.5, -0.2))
+        body.box((0.5, 0.12, 0.04), loc=(s * 0.7, 2.28, 0.38), mat='Trim', rot=(0, 0, s * 0.2))   # canards
     B_ = body.obj('Body')
     V = B()
     vinyl_side(V, sh, 1.0, -0.4, 0.4, 0.72)

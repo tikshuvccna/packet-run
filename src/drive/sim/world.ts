@@ -398,7 +398,7 @@ export class DriveSim {
     for (const d of this.drivers) {
       if (d.kind !== 'traffic') continue;
       const dist = Math.hypot(d.car.x - p.x, d.car.z - p.z);
-      if (dist < 4.2 && p.lastImpact <= 0.05) { d.near = true; d.nearT = this.time; }
+      if (dist < 3.3 && p.lastImpact <= 0.05) { d.near = true; d.nearT = this.time; }
       else if (d.near && dist > 9) {
         d.near = false;
         if (p.lastImpact <= 0.05 && this.time - d.nearT < 1.2) {

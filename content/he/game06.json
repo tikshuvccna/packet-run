@@ -5,34 +5,22 @@
   "story": "מכוניות מבקשות הודעות. בחרו את טווח השידור הנכון, או מצאו איזה חוק נשבר.",
   "levels": {
     "easy": {
-      "rounds": 8,
+      "items": 12,
       "lives": 4,
-      "timer": 0,
-      "mix": [
-        "cast",
-        "rule"
-      ],
-      "pass": 6
+      "fallSec": 9,
+      "pass": 9
     },
     "medium": {
-      "rounds": 10,
+      "items": 16,
       "lives": 3,
-      "timer": 14,
-      "mix": [
-        "cast",
-        "rule"
-      ],
-      "pass": 8
+      "fallSec": 7.5,
+      "pass": 13
     },
     "hard": {
-      "rounds": 12,
+      "items": 22,
       "lives": 3,
-      "timer": 9,
-      "mix": [
-        "cast",
-        "rule"
-      ],
-      "pass": 10
+      "fallSec": 6,
+      "pass": 18
     }
   },
   "cast": [

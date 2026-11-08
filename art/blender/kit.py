@@ -113,7 +113,7 @@ def plant_pot(b, x, y, z=0.0, pot='Accent', leaf='Leaf'):
     b.sphere(0.5, loc=(x, y, z + 0.85), scale=(1, 1, 0.9), mat=leaf, seg=10, rings=6)
 
 
-def bld_mats(wall, roof, accent, wall2='#fbf3e2', glass='#4f74a8', frame='#fbf6ec', trim=None, door='#7a4a3a'):
+def bld_mats(wall, roof, accent, wall2='#fbf3e2', glass='#6b9bd6', frame='#fbf6ec', trim=None, door='#7a4a3a'):
     M('Wall', wall, rough=0.85)
     M('Roof', roof, rough=0.8)
     M('Accent', accent, rough=0.6)

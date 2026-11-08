@@ -27,6 +27,29 @@ async (step) => {
       const bucket = w.buckets.find((b) => b.id === it.bucket);
       q('.bucket').find((b) => b.textContent.trim() === bucket.label).click();
     }
+  } else if (w.type === 'msglab') {
+    const sendIt = async () => { byText('.btn', 'שלחו').click(); await wait(2100); };
+    await sendIt();
+    const rb = q('.rulebtn');
+    for (let i = 0; i < 3; i++) { rb[i].click(); await sendIt(); rb[i].click(); }
+  } else if (w.type === 'encode') {
+    q('.switches .sw').forEach((b) => b.click());
+  } else if (w.type === 'cast') {
+    const modes = q('.switches .sw');
+    for (const [mi, picks] of [[0, [1]], [1, [2, 3]], [2, []]]) {
+      modes[mi].click();
+      for (const p of picks) q('.host')[p].click();
+      byText('.btn', 'שלחו').click();
+      await wait(80);
+    }
+  } else if (w.type === 'flowsim') {
+    const sl = q('input[type=range]')[0];
+    for (const v of ['12', '2']) { sl.value = v; sl.dispatchEvent(new Event('input')); byText('.btn', 'שלחו 8 שניות').click(); await wait(80); }
+  } else if (w.type === 'journey') {
+    for (let i = 0; i < 40; i++) { const nb = q('.widget .btn.primary')[0]; if (!nb) break; nb.click(); await wait(10); }
+  } else if (w.type === 'tcpudp') {
+    const sl = q('input[type=range]')[0]; sl.value = '40'; sl.dispatchEvent(new Event('input'));
+    q('.switches .sw').forEach((b) => b.click());
   } else if (w.type === 'wrap') {
     for (let i = 0; i < w.layers.length; i++) byText('.sw', 'עטפו').click();
     for (let i = 0; i < w.layers.length; i++) byText('.sw', 'קלפו').click();

@@ -1,6 +1,6 @@
 import { GAMES } from '../content';
-import { beamRounds, craneTasks, towerItems, type CraneTask } from '../learn/rounds';
-import { rng, shuffle } from '../learn/rng';
+import { towerItems } from '../learn/rounds';
+import { runBelt, runCrane } from './arcade';
 import type { GameData, Level } from '../learn/types';
 import { grantPrize, PRIZES, type Prize } from '../game/progress';
 import { btn, clear, flash, h, overlay, wait } from './dom';
@@ -11,12 +11,12 @@ export interface GameResult { passed: boolean; points: number; max: number; priz
 const LEVEL_HE: Record<Level, string> = { easy: 'קל', medium: 'בינוני', hard: 'קשה' };
 export { LEVEL_HE };
 
-interface Shell {
+export interface Shell {
   root: HTMLElement; stage: HTMLElement; close: () => void;
   setHearts: (n: number) => void; setProgress: (done: number, total: number, points: number) => void;
 }
 
-function shell(title: string, level: Level, lives: number, ctx: Ctx, onQuit: () => void): Shell {
+export function shell(title: string, level: Level, lives: number, ctx: Ctx, onQuit: () => void): Shell {
   const { root, close } = overlay('game-screen');
   ctx.audio.mood('game');
   const head = h('div', 'ghead');
@@ -33,7 +33,7 @@ function shell(title: string, level: Level, lives: number, ctx: Ctx, onQuit: () 
   };
 }
 
-async function finish(ctx: Ctx, sh: Shell, lessonId: string, data: GameData, level: Level, points: number, max: number): Promise<GameResult> {
+export async function finish(ctx: Ctx, sh: Shell, lessonId: string, data: GameData, level: Level, points: number, max: number): Promise<GameResult> {
   const cfg = data.levels[level];
   const passed = points >= cfg.pass;
   const lp = ctx.save.lesson(lessonId);
@@ -67,146 +67,8 @@ export function runGame(ctx: Ctx, lessonId: string, gameId: string, level: Level
   const data = GAMES[gameId];
   if (!data) return Promise.resolve({ passed: false, points: 0, max: 0, prize: null });
   if (data.kind === 'tower') return runTower(ctx, lessonId, data, level);
-  return runRounds(ctx, lessonId, data, level);
-}
-
-/* ------------------------------------------------------------------ choice / sequence rounds (beam, crane) */
-
-interface RoundChoice { type: 'choice'; title: string; text: string; options: { id: string; label: string }[]; answer: string; decorate?: (stage: HTMLElement, chosen: string) => void }
-interface RoundSeq { type: 'seq'; title: string; items: string[]; order: string[]; hint: string }
-type Round = RoundChoice | RoundSeq;
-
-function buildRounds(data: GameData, level: Level, seed: number): Round[] {
-  if (data.kind === 'beam') {
-    const castOpts = data['castOptions'] as { id: string; label: string }[];
-    const ruleOpts = data['ruleOptions'] as { id: string; label: string }[];
-    return beamRounds(data, level, seed).map((r): Round => r.kind === 'cast'
-      ? { type: 'choice', title: 'באיזה רוחב קרן שולחים?', text: r.text, options: castOpts, answer: r.answer }
-      : { type: 'choice', title: 'איזה חוק נשבר?', text: r.text, options: ruleOpts, answer: r.answer });
-  }
-  const layerOpts = data['layerOptions'] as { id: string; label: string }[];
-  const portOpts = (data['portOptions'] as string[]).map((p) => ({ id: p, label: p }));
-  const pduOpts = (data['pdus'] as string[]).map((p) => ({ id: p, label: p }));
-  return craneTasks(data, level, seed).map((t: CraneTask): Round => {
-    switch (t.kind) {
-      case 'wrap': return { type: 'seq', title: 'מעמיסים: מהפנימית אל החיצונית', items: t.pdus, order: t.pdus, hint: 'קודם המידע, כל עטיפה נוספת מבחוץ' };
-      case 'peel': return { type: 'seq', title: 'מפרקים ביעד: מהחיצונית אל הפנימית', items: t.pdus, order: [...t.pdus].reverse(), hint: 'מקלפים קודם את החיצונית' };
-      case 'layer': return { type: 'choice', title: 'לאיזו שכבה ב-TCP/IP שייך?', text: t.text, options: layerOpts, answer: t.answer };
-      case 'port': return { type: 'choice', title: 'איזה שירות משתמש בפורט?', text: t.text, options: portOpts, answer: t.answer };
-      case 'has': return { type: 'choice', title: 'איזו יחידה?', text: t.text, options: pduOpts, answer: t.answer };
-    }
-  });
-}
-
-function runRounds(ctx: Ctx, lessonId: string, data: GameData, level: Level): Promise<GameResult> {
-  const cfg = data.levels[level];
-  const seed = Math.floor(Math.random() * 1e6);
-  const rounds = buildRounds(data, level, seed);
-  let lives = cfg.lives;
-  let points = 0;
-  let idx = 0;
-  let quit = false;
-  return new Promise((resolve) => {
-    const sh = shell(data.title, level, cfg.lives, ctx, () => { quit = true; sh.close(); resolve({ passed: false, points, max: rounds.length, prize: null }); });
-    sh.setHearts(lives);
-    const story = h('div', 'panel dim', data.story);
-
-    const next = async (): Promise<void> => {
-      if (quit) return;
-      if (idx >= rounds.length || lives <= 0) { resolve(await finish(ctx, sh, lessonId, data, level, points, rounds.length)); return; }
-      sh.setProgress(idx, rounds.length, points);
-      const r = rounds[idx] as Round;
-      clear(sh.stage);
-      const card = h('div', 'lcard game');
-      card.appendChild(h('div', 'qlabel', r.title));
-      let timerFill: HTMLElement | null = null;
-      let timeLeft = cfg.timer ?? 0;
-      let timerId = 0;
-      let settled = false;
-      const settle = async (ok: boolean, shown: string): Promise<void> => {
-        if (settled) return;
-        settled = true;
-        clearInterval(timerId);
-        if (ok) { points++; ctx.audio.sfx('good'); } else { lives--; ctx.audio.sfx('bad'); sh.setHearts(lives); }
-        sh.setProgress(idx + 1, rounds.length, points);
-        const fb = h('div', ok ? 'feedback good' : 'feedback bad', ok ? 'נכון!' : `התשובה: ${shown}`);
-        card.appendChild(fb);
-        await wait(ok ? 650 : 1500);
-        idx++;
-        void next();
-      };
-      if ((cfg.timer ?? 0) > 0) {
-        const tb = h('div', 'timerbar');
-        timerFill = h('div', 'timerfill');
-        tb.appendChild(timerFill);
-        card.appendChild(tb);
-        const t0 = performance.now();
-        timerId = window.setInterval(() => {
-          const left = (cfg.timer as number) - (performance.now() - t0) / 1000;
-          timeLeft = left;
-          (timerFill as HTMLElement).style.width = `${Math.max(0, (left / (cfg.timer as number)) * 100)}%`;
-          if (left <= 0) {
-            const shown = r.type === 'choice' ? (r.options.find((o) => o.id === r.answer)?.label ?? '') : r.order.join(' ← ');
-            void settle(false, shown);
-          }
-        }, 80);
-      }
-      void timeLeft;
-      if (r.type === 'choice') {
-        const scene = h('div', 'gscene');
-        scene.appendChild(h('div', 'gtext', r.text));
-        card.appendChild(scene);
-        const opts = h('div', 'options row');
-        for (const o of r.options) {
-          const b = btn(o.label, () => {
-            if (settled) return;
-            const ok = o.id === r.answer;
-            b.classList.add(ok ? 'ok' : 'bad');
-            opts.querySelectorAll('button').forEach((x) => ((x as HTMLButtonElement).disabled = true));
-            if (data.kind === 'beam') showBeam(scene, r.answer === o.id ? r.answer : r.answer, ok);
-            void settle(ok, r.options.find((x) => x.id === r.answer)?.label ?? '');
-          }, 'btn option');
-          opts.appendChild(b);
-        }
-        card.appendChild(opts);
-      } else {
-        const slots = h('div', 'slots');
-        const pool = h('div', 'pool');
-        r.order.forEach((_, k) => slots.appendChild(h('div', 'slot', String(k + 1))));
-        let n = 0;
-        let bad = false;
-        const mixed = shuffle(r.items, rng(seed + idx * 13));
-        if (mixed.every((v, k) => v === r.items[k]) && mixed.length > 1) mixed.reverse();
-        for (const it of mixed) {
-          const b = btn(it, () => {
-            if (b.disabled || settled) return;
-            const want = r.order[n];
-            const slot = slots.children[n] as HTMLElement;
-            slot.textContent = it;
-            slot.classList.add('filled');
-            b.disabled = true;
-            if (it !== want) { bad = true; slot.classList.add('bad'); }
-            n++;
-            ctx.audio.sfx('click');
-            if (n === r.order.length) void settle(!bad, r.order.join(' ← '));
-          }, 'btn item crate');
-          pool.appendChild(b);
-        }
-        card.append(slots, pool, h('div', 'panel dim', r.hint));
-      }
-      sh.stage.appendChild(card);
-      sh.stage.appendChild(story);
-    };
-    void next();
-  });
-}
-
-function showBeam(scene: HTMLElement, answer: string, ok: boolean): void {
-  const count = answer === 'uni' ? 1 : answer === 'multi' ? 3 : 7;
-  const fleet = h('div', 'fleet');
-  for (let i = 0; i < 7; i++) fleet.appendChild(h('div', i < count ? 'shipicon lit' : 'shipicon'));
-  scene.appendChild(fleet);
-  flash(scene, ok ? 'glow' : 'shake', 900);
+  if (data.kind === 'beam') return runBelt(ctx, lessonId, data, level);
+  return runCrane(ctx, lessonId, data, level);
 }
 
 /* ------------------------------------------------------------------ tower (falling items) */

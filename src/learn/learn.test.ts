@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beamRounds, craneTasks, towerItems } from './rounds';
+import { towerItems } from './rounds';
 import { isCorrect, score, shuffleOptions } from './quizLogic';
 import { GAMES, LESSONS, QUIZZES } from '../content';
 import { LEVELS } from './types';
@@ -44,14 +44,6 @@ describe('content integrity', () => {
 });
 
 describe('games are deterministic and sized', () => {
-  it('beam rounds', () => {
-    const g = GAMES['game06']!;
-    for (const lv of LEVELS) {
-      const a = beamRounds(g, lv, 5);
-      expect(a).toEqual(beamRounds(g, lv, 5));
-      expect(a.length).toBe(g.levels[lv].rounds);
-    }
-  });
   it('tower items', () => {
     const g = GAMES['game07']!;
     for (const lv of LEVELS) {
@@ -59,9 +51,5 @@ describe('games are deterministic and sized', () => {
       expect(it.length).toBe(g.levels[lv].items);
       for (const x of it) expect(g.levels[lv].layers).toContain(x.layer);
     }
-  });
-  it('crane tasks', () => {
-    const g = GAMES['game08']!;
-    for (const lv of LEVELS) expect(craneTasks(g, lv, 9).length).toBe(g.levels[lv].rounds);
   });
 });

@@ -288,7 +288,66 @@ def water():
     save_rgb(Image.fromarray(img.astype(np.uint8), 'RGB'), 'water.png')
 
 
+def fx():
+    """skid.png (tyre mark strip, tile along v), speedlines.png (radial streaks, additive overlay), boost_ring.png,
+    coin_icon.png (HUD), item icons are not needed (3D)."""
+    # skid: two dark rubber tracks with tread chevrons, alpha, 128 x 512, u across, v along (seamless in v)
+    w, h = 128, 512
+    im = Image.new('RGBA', (w * S, h * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for k in range(16):
+        y = k * h * S // 16
+        d.polygon([(8 * S, y), (w * S // 2 - 8 * S, y + 8 * S), (w * S - 8 * S, y), (w * S - 8 * S, y + 22 * S),
+                   (w * S // 2 - 8 * S, y + 30 * S), (8 * S, y + 22 * S)], fill=(30, 26, 34, 150))
+    im = im.resize((w, h), Image.LANCZOS)
+    a = im.getchannel('A').filter(ImageFilter.GaussianBlur(1.2))
+    im.putalpha(a)
+    im.save(os.path.join(TEX, 'skid.png'))
+    print('TEX skid.png')
+    # speed lines: white streaks from the edges toward the centre, transparent middle, 512
+    n = 512
+    im = Image.new('RGBA', (n * 2, n * 2), (255, 255, 255, 0))
+    d = ImageDraw.Draw(im)
+    rnd = random.Random(21)
+    c = n
+    for _ in range(70):
+        a = rnd.random() * math.tau
+        r0 = n * (0.55 + 0.3 * rnd.random())
+        r1 = n * 1.5
+        wdt = rnd.uniform(0.004, 0.012)
+        pts = [(c + r0 * math.cos(a), c + r0 * math.sin(a)), (c + r1 * math.cos(a - wdt), c + r1 * math.sin(a - wdt)),
+               (c + r1 * math.cos(a + wdt), c + r1 * math.sin(a + wdt))]
+        d.polygon(pts, fill=(255, 255, 255, rnd.randrange(110, 210)))
+    im = im.resize((n, n), Image.LANCZOS)
+    im.save(os.path.join(TEX, 'speedlines.png'))
+    print('TEX speedlines.png')
+    # boost ring: glowing cyan shock ring (additive sprite), 256
+    s2 = 256
+    yy, xx = np.mgrid[0:s2, 0:s2]
+    r = np.hypot(xx - s2 / 2, yy - s2 / 2) / (s2 / 2)
+    a = np.exp(-((r - 0.75) / 0.09) ** 2) + 0.5 * np.exp(-((r - 0.55) / 0.05) ** 2)
+    rgba = np.zeros((s2, s2, 4), np.float32)
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = 120 + 135 * np.clip(a, 0, 1), 230, 255
+    rgba[..., 3] = np.clip(a, 0, 1) * 255
+    Image.fromarray(rgba.astype(np.uint8), 'RGBA').save(os.path.join(TEX, 'boost_ring.png'))
+    print('TEX boost_ring.png')
+    # HUD coin icon 128: gold coin with rim, envelope emblem, outline
+    m = 128
+    im = Image.new('RGBA', (m * S, m * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    M_ = m * S
+    d.ellipse([3 * S, 3 * S, M_ - 3 * S, M_ - 3 * S], fill=(42, 32, 54, 255))
+    d.ellipse([7 * S, 7 * S, M_ - 7 * S, M_ - 7 * S], fill=(240, 160, 32, 255))
+    d.ellipse([16 * S, 14 * S, M_ - 16 * S, M_ - 18 * S], fill=(255, 207, 58, 255))
+    d.ellipse([24 * S, 20 * S, 52 * S, 34 * S], fill=(255, 238, 160, 255))
+    x0, y0, x1, y1 = 38 * S, 48 * S, 90 * S, 82 * S
+    d.rectangle([x0, y0, x1, y1], fill=(240, 160, 32, 255))
+    d.line([(x0, y0), ((x0 + x1) // 2, (y0 + y1) // 2 + 2 * S), (x1, y0)], fill=(255, 238, 160, 255), width=4 * S)
+    im.resize((m, m), Image.LANCZOS).save(os.path.join(TEX, 'coin_icon.png'))
+    print('TEX coin_icon.png')
+
+
 if __name__ == '__main__':
-    groups = sys.argv[1:] or ['vinyl', 'road', 'ground', 'sky', 'water']
+    groups = sys.argv[1:] or ['vinyl', 'road', 'ground', 'sky', 'water', 'fx']
     for g in groups:
         globals()[g]()

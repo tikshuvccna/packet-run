@@ -247,3 +247,72 @@ html, body { margin: 0; height: 100%; background: #04101c; color: var(--foam); f
 .statrow { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: center; font-weight: 700; font-size: .85rem; }
 .gpanel .bar-track { background: rgba(8, 26, 45, .2); }
 @media (max-width: 720px) { .screen.garage-screen { justify-content: center; align-items: flex-end; } .gpanel { max-height: 62%; } }
+
+/* ---------- lesson simulations */
+.okmsg { background: #c8f5d5 !important; color: #1f6a3d; }
+.badmsg { background: #ffd0ca !important; color: #8f2a22; }
+.simroad { position: relative; height: 96px; background: #4a5568; border-radius: 12px; margin: 8px 0; overflow: hidden; direction: ltr; }
+.roadline { position: absolute; left: 14%; right: 14%; top: 50%; border-top: 4px dashed rgba(255,255,255,.7); }
+.simcar { position: absolute; top: 50%; transform: translateY(-50%); width: 64px; height: 40px; background: linear-gradient(#ffd877, #e0a940); border-radius: 12px; font-size: .7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; color: var(--ink); box-shadow: 0 3px 6px rgba(0,0,0,.4); }
+.simcar.a { left: 4px; } .simcar.b { right: 4px; background: linear-gradient(#9ee7ff, #4a90e2); }
+.envelope { position: absolute; top: 14%; left: 12%; background: #fff6dc; color: var(--ink); border: 2px solid var(--brass2); border-radius: 8px; padding: 2px 10px; font-weight: 800; font-size: .85rem; white-space: nowrap; transition: left 1.2s; }
+.envelope.arrived { background: #c8f5d5; } .envelope.lost { background: #ffd0ca; opacity: .55; }
+.rulegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; margin: 8px 0; }
+.rulebtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; }
+.rulebtn small { font-weight: 600; opacity: .8; }
+.rulebtn.broken { background: linear-gradient(#ffd0ca, #f29a90); border-color: var(--bad); }
+.bitsrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; direction: ltr; }
+.bitgroup { background: #fff; border: 2px solid var(--sea); border-radius: 10px; padding: 4px 8px; text-align: center; }
+.bitchar { font-weight: 900; font-size: 1.3rem; } .bitdigits { font-family: monospace; letter-spacing: 2px; font-weight: 800; color: var(--sea); }
+.bitwire { display: flex; align-items: center; height: 34px; padding: 0 6px; gap: 2px; border-radius: 8px; overflow: hidden; margin: 6px 0; direction: ltr; background: #3b4252; }
+.bitwire .pulse { flex: 1 1 0; max-width: 14px; border-radius: 3px; }
+.bitwire.copper .pulse.hi { background: #ffb84a; height: 26px; } .bitwire.copper .pulse.lo { background: #8a5a22; height: 8px; }
+.bitwire.fiber .pulse.hi { background: #fff6a0; height: 26px; box-shadow: 0 0 8px #ffee70; } .bitwire.fiber .pulse.lo { background: #2a3040; height: 26px; }
+.bitwire.air .pulse.hi { background: #8bd0ff; height: 26px; border-radius: 50%; } .bitwire.air .pulse.lo { background: #8bd0ff; height: 10px; border-radius: 50%; opacity: .6; }
+.castnet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0; }
+.host { padding: 12px 4px; border-radius: 12px; border: 3px solid #8aa0b3; background: #fff; font: inherit; font-weight: 800; cursor: pointer; color: var(--ink); }
+.host.sender { background: linear-gradient(#ffd877, var(--brass)); }
+.host.picked { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(53,211,176,.4); }
+.host.got { background: #c8f5d5; border-color: var(--ok); animation: pulse .6s; }
+.queuebar { display: flex; gap: 4px; margin: 6px 0; } .slotfull, .slotempty { width: 28px; height: 18px; border-radius: 4px; background: #c9d4dc; } .slotfull { background: var(--coral); }
+.flowstat { font-weight: 800; }
+.jcols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; align-items: start; }
+.jstack { display: flex; flex-direction: column; gap: 4px; }
+.jrow { display: flex; justify-content: space-between; gap: 6px; background: #fff; border: 2px solid #b8c4cc; border-radius: 8px; padding: 6px 8px; font-size: .85rem; transition: all .2s; }
+.jrow.now { border-color: var(--brass); background: #fff3c4; transform: scale(1.03); }
+.jwire { background: #3b4252; color: #fff; justify-content: center; }
+.jpacket { min-height: 120px; display: flex; justify-content: center; align-items: center; }
+.tcpout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin: 8px 0; }
+.tcpcard { background: #fff; border: 2px solid var(--sea); border-radius: 10px; padding: 6px 10px; font-weight: 800; }
+.tcpcard.tcp { border-color: var(--ok); } .tcpcard.udp { border-color: var(--coral); }
+.logline { font-size: .8rem; padding: 1px 4px; font-family: monospace; direction: rtl; }
+@media (max-width: 480px) { .jcols { grid-template-columns: 1fr; } .castnet { grid-template-columns: repeat(4, 1fr); } }
+
+/* ---------- arcade games */
+.belt { position: relative; width: 100%; height: min(330px, 46vh); background: linear-gradient(#27465f, #1b3347); border: 3px solid var(--brass2); border-radius: 14px; overflow: hidden; direction: ltr; }
+.belt.crane { height: min(280px, 40vh); background: linear-gradient(#bfe9f5, #7ccbe0); }
+.beltfloor { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: repeating-linear-gradient(90deg, #3b4252 0 24px, #2f3644 24px 28px); animation: beltmove 1.2s linear infinite; }
+@keyframes beltmove { to { background-position-x: -28px; } }
+.beltstation { position: absolute; left: 28%; width: 28%; top: 0; bottom: 0; background: rgba(255, 216, 119, .12); border-left: 3px dashed rgba(255,216,119,.6); border-right: 3px dashed rgba(255,216,119,.6); color: #ffe39a; font-weight: 800; font-size: .8rem; text-align: center; padding-top: 4px; }
+.parcel { position: absolute; bottom: 40px; min-width: 96px; max-width: 150px; padding: 10px 8px; border-radius: 8px; background: repeating-linear-gradient(90deg, #d7a468 0 14px, #c28f55 14px 16px); border: 3px solid #7a4a22; color: #1d2a3a; font-weight: 900; text-align: center; font-size: .85rem; direction: rtl; transition: transform .3s, opacity .5s; }
+.parcel.active { outline: 4px solid var(--teal); }
+.parcel.size { transform: scale(1.55); transform-origin: bottom center; min-width: 120px; }
+.parcel.time { background: repeating-linear-gradient(90deg, #ffd877 0 8px, #ff7f6e 8px 12px); }
+.parcel.code .plabel { letter-spacing: 3px; transform: skewX(-12deg); color: #b3392f; }
+.parcel.fmt { border-style: dashed; clip-path: polygon(0 0, 92% 0, 100% 20%, 94% 45%, 100% 70%, 92% 100%, 0 100%); }
+.parcel.addr { background: #e8d9b0; border-color: #9c7a38; }
+.parcel.radio { background: linear-gradient(#cfe8ff, #8fc0ee); border-color: #2f6fa8; font-size: .8rem; min-width: 150px; max-width: 190px; }
+.parcel.fixed { opacity: 0; transform: translateY(-80px) scale(.7); }
+.parcel.broken { background: #ffd0ca; opacity: .3; transform: rotate(14deg) translateY(30px); }
+.belttools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; justify-content: center; }
+.tool { min-width: 84px; }
+.tool.castt { background: linear-gradient(#cfe8ff, #8fc0ee); border-color: #2f6fa8; }
+.beltcombo { text-align: center; color: #ffe39a; font-weight: 900; font-size: 1.2rem; }
+.cranetitle { font-weight: 800; text-align: center; color: #ffe39a; padding: 4px; }
+.container { position: absolute; padding: 12px 10px; min-width: 110px; max-width: 170px; border: 3px solid #1d2a3a; border-radius: 6px; font: inherit; font-weight: 900; font-size: .85rem; color: #fff; white-space: pre-line; text-align: center; cursor: pointer; background: repeating-linear-gradient(90deg, #e55a4e 0 12px, #c24a3f 12px 14px); direction: rtl; transition: opacity .4s, transform .4s; touch-action: manipulation; }
+.container:nth-of-type(3n) { background: repeating-linear-gradient(90deg, #4a90e2 0 12px, #3a78c0 12px 14px); }
+.container:nth-of-type(3n+1) { background: repeating-linear-gradient(90deg, #35b08f 0 12px, #2a9378 12px 14px); }
+.container.fixed { opacity: 0; transform: translateY(90px) scale(.6); }
+.container.broken { opacity: .2; transform: rotate(-12deg) translateY(40px); }
+.cranestack { display: flex; justify-content: center; margin: 10px 0; min-height: 100px; }
+.cranestack .nestcore.dim { opacity: .5; }

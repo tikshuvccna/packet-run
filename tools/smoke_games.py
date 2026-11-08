@@ -3,7 +3,7 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from playwright.sync_api import sync_playwright
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5201"
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5211"
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 CLICK_AROUND = r"""
@@ -11,7 +11,7 @@ async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   let clicks = 0;
   for (let i = 0; i < 40; i++) {
-    const cands = [...document.querySelectorAll('.option:not(:disabled), .pool .item:not(:disabled), .floor, .lfoot .btn:not(:disabled)')];
+    const cands = [...document.querySelectorAll('.option:not(:disabled), .pool .item:not(:disabled), .floor, .tool, .container, .lfoot .btn:not(:disabled)')];
     if (!cands.length) { await wait(200); continue; }
     const c = cands[Math.floor(Math.random() * cands.length)];
     c.click(); clicks++;

@@ -8,6 +8,7 @@ import { hash2 } from '../drive/sim/rng';
 import type { Building, City, Prop, RoadEdge, RoadNode } from './city';
 import { HALF } from './city';
 import { GeoBuilder } from './geo';
+import { KitBatch, kitModel, kitPlacement, type KitModel } from './kit';
 import { hullMaterial, textTexture, toon, toonGradient } from './toon';
 
 export const CHUNK = 250;
@@ -61,6 +62,9 @@ export class CityMesh {
   private matSolid: THREE.MeshToonMaterial;
   private matGlow: THREE.MeshToonMaterial;
   private lastKey = '';
+  private stale = new Set<number>();
+  private globalGroup: THREE.Group | null = null;
+  private kb: { solid: KitBatch; glow: KitBatch; hull: KitBatch } | null = null;
 
   constructor(readonly city: City, cleaned: number[], opts: { outlines: boolean; shadows: boolean }) {
     this.cleaned = new Set(cleaned);
@@ -90,6 +94,12 @@ export class CityMesh {
         }
       }
     }
+    this.buildGlobal();
+  }
+
+  /** Called when the art kit finished loading: rebuild the global pieces now and every live chunk progressively. */
+  kitReady(): void {
+    for (const k of this.live.keys()) this.stale.add(k);
     this.buildGlobal();
   }
 
@@ -124,6 +134,23 @@ export class CityMesh {
       });
     }
     let n = 0;
+    if (this.stale.size && !this.queue.length) {
+      // swap one stale chunk (built before the kit loaded) for a kit version
+      let best = -1, bd = Infinity;
+      for (const k of this.stale) {
+        if (!this.live.has(k)) { this.stale.delete(k); continue; }
+        const d = Math.hypot(-HALF + ((k % NC) + 0.5) * CHUNK - x, -HALF + (Math.floor(k / NC) + 0.5) * CHUNK - z);
+        if (d < bd) { bd = d; best = k; }
+      }
+      if (best >= 0) {
+        this.stale.delete(best);
+        const old = this.live.get(best);
+        const g = this.buildChunk(best);
+        if (old) this.disposeGroup(old);
+        this.live.set(best, g); this.group.add(g);
+        n++;
+      }
+    }
     while (this.queue.length && n < budget) {
       const k = this.queue.shift() as number;
       if (this.live.has(k)) continue;
@@ -133,7 +160,7 @@ export class CityMesh {
       n++;
     }
   }
-  get pending(): number { return this.queue.length; }
+  get pending(): number { return this.queue.length + this.stale.size; }
 
   private disposeGroup(g: THREE.Group): void {
     this.group.remove(g);
@@ -149,6 +176,7 @@ export class CityMesh {
     const g = new THREE.Group();
     g.name = `chunk${k}`;
     const ground = new GeoBuilder(), road = new GeoBuilder(), walls = new GeoBuilder(), solid = new GeoBuilder(), hull = new GeoBuilder(), glow = new GeoBuilder();
+    this.kb = { solid: new KitBatch(), glow: new KitBatch(), hull: new KitBatch() };
     const dirtyAt = (x: number, z: number): boolean => !this.cleaned.has(city.districtAt(x, z));
 
     // ---- ground grid
@@ -279,10 +307,50 @@ export class CityMesh {
     add(solid, this.matSolid, true, true);
     add(glow, this.matGlow, false, false);
     if (this.outlines) add(hull, hullMaterial(), false, false);
+    const kb = this.kb;
+    if (kb) {
+      const addK = (b: KitBatch, mat: THREE.Material, shadow: boolean): void => {
+        const geo = b.build();
+        if (!geo) return;
+        const m = new THREE.Mesh(geo, mat);
+        m.castShadow = shadow && this.shadows; m.receiveShadow = this.shadows;
+        m.matrixAutoUpdate = false;
+        g.add(m);
+      };
+      addK(kb.solid, this.matSolid, true);
+      addK(kb.glow, this.matGlow, false);
+      if (this.outlines) addK(kb.hull, hullMaterial(), false);
+    }
+    this.kb = null;
     return g;
   }
 
+  /** Bake a kit model into the current chunk batches. */
+  private bakeKit(m: KitModel, x: number, y: number, z: number, th: number, sx: number, sy: number, sz: number, dirty: boolean, outline: boolean): void {
+    const kb = this.kb;
+    if (!kb) return;
+    const tint = dirty ? noisyTint : null;
+    kb.solid.add(m.fixed, x, y, z, th, sx, sy, sz, tint);
+    kb.solid.add(m.paint, x, y, z, th, sx, sy, sz, tint);
+    kb.glow.add(m.glow, x, y, z, th, sx, sy, sz, tint);
+    if (outline && this.outlines) {
+      const b = m.bounds;
+      const size = Math.max(b[3] - b[0], b[5] - b[2]) * Math.max(sx, sz);
+      const f = 1 + 0.32 / Math.max(2, size);
+      const ctr: [number, number, number] = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2];
+      kb.hull.add(m.fixed, x, y, z, th, sx, sy, sz, null, BLACK, f, ctr);
+      kb.hull.add(m.paint, x, y, z, th, sx, sy, sz, null, BLACK, f, ctr);
+    }
+  }
+
   private building(b: Building, walls: GeoBuilder, solid: GeoBuilder, hull: GeoBuilder, glow: GeoBuilder, dirty: boolean): void {
+    const km = b.ks > 0 ? kitModel(b.kit) : null;
+    if (km) {
+      const pl = kitPlacement(b.kit, b.x, b.z, b.fx, b.fz, b.ks);
+      // sink a little so slopes never show a gap under the model
+      this.bakeKit(km, pl.ox, b.base - 0.15, pl.oz, pl.th, b.ks, b.ks, b.ks, dirty, true);
+      return;
+    }
     const d = DISTRICTS[b.district - 1] ?? DISTRICTS[0]!;
     const pal = d.palette;
     const wall = noisy(jitter(col(pal.wall), b.seed, 0.12), dirty), roof = noisy(jitter(col(pal.roof), b.seed + 1, 0.08), dirty), acc = noisy(jitter(col(pal.accent), b.seed + 2, 0.06), dirty);
@@ -416,6 +484,19 @@ export class CityMesh {
   }
 
   private prop(p: Prop, solid: GeoBuilder, hull: GeoBuilder, glow: GeoBuilder, dirty: boolean): void {
+    const map: Partial<Record<Prop['kind'], string>> = { tree: 'tree_a', tree2: 'tree_b', tree3: 'tree_c', palm: 'tree_c', bush: 'bush', bench: 'bench', crate: 'crate', barrel: 'barrel', statue: 'statue_small', lamp: 'lamp_post' };
+    let kname = map[p.kind];
+    if (p.kind === 'rock') kname = Math.round(p.x) % 2 ? 'rock_a' : 'rock_b';
+    if (p.kind === 'bush' && Math.round(p.z) % 3 === 0) kname = 'plant_flowers';
+    const km = kname ? kitModel(kname) : null;
+    if (km) {
+      let th = p.rot, sc = p.s;
+      if (p.kind === 'lamp') { const ax = Math.cos(p.rot + Math.PI / 2), az = Math.sin(p.rot + Math.PI / 2); th = Math.atan2(-ax, -az); sc = 1.15; }
+      if (p.kind.startsWith('tree') || p.kind === 'palm') sc *= 1.15;
+      if (p.kind === 'rock') sc *= 1.3;
+      this.bakeKit(km, p.x, p.y - 0.05, p.z, th, sc, sc, sc, dirty, p.kind !== 'lamp');
+      return;
+    }
     const y = p.y, s = p.s;
     const leaf = noisy(col(['#5aa05a', '#6cb04f', '#4f9a6a', '#78b84f'][Math.floor(hash2(Math.round(p.x), Math.round(p.z)) * 4)] ?? '#5aa05a'), dirty);
     const trunk = col('#8a6a4a');
@@ -508,7 +589,10 @@ export class CityMesh {
   /* ------------------------------------------------------------------ global (whole-map) pieces */
   private buildGlobal(): void {
     const city = this.city;
+    if (this.globalGroup) { this.group.remove(this.globalGroup); this.globalGroup.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); }
     const gl = new THREE.Group();
+    this.globalGroup = gl;
+    this.kb = { solid: new KitBatch(), glow: new KitBatch(), hull: new KitBatch() };
     // sea + river water: one big plane
     const water = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 4, HALF * 4, 1, 1).rotateX(-Math.PI / 2), new THREE.MeshToonMaterial({ color: 0x3f8fc9, gradientMap: toonGradient(), transparent: true, opacity: 0.88 }));
     water.position.y = -1.6;
@@ -565,8 +649,14 @@ export class CityMesh {
       }
       void a; void b;
     }
-    // ramps (striped wedges)
+    // ramps (kit model stretched to the physical ramp; striped wedge fallback)
+    const rampKit = kitModel('ramp');
     for (const rp of city.ramps) {
+      if (rampKit) {
+        const b = rampKit.bounds;
+        this.bakeKit(rampKit, rp.x, city.groundAt(rp.x, rp.z) + 0.02, rp.z, -rp.h, rp.w / (b[3] - b[0]), rp.height / (b[4] - b[1]), rp.len / (b[5] - b[2]), false, true);
+        continue;
+      }
       const fx = Math.sin(rp.h), fz = -Math.cos(rp.h), rx = Math.cos(rp.h), rz = Math.sin(rp.h);
       const base = city.groundAt(rp.x, rp.z) + 0.03;
       const P = (along: number, lat: number, up: number): number[] => [rp.x + fx * (along - rp.len / 2) + rx * lat, base + up, rp.z + fz * (along - rp.len / 2) + rz * lat];
@@ -586,7 +676,13 @@ export class CityMesh {
     }
     // landmark tower on the central island: seven glowing layers
     const L = city.landmark;
-    if (L.r > 0) {
+    const lt = kitModel('landmark_tower');
+    if (L.r > 0 && lt) {
+      const y = city.heightAt(L.x, L.z) + 0.3;
+      solid.cyl(L.x, y - 0.3, L.z, L.r, L.r, 0.6, 32, col('#7fbf6a'));
+      const sc = (L.r * 1.7) / (lt.bounds[3] - lt.bounds[0]);
+      this.bakeKit(lt, L.x, y, L.z, 0, sc, sc, sc, false, true);
+    } else if (L.r > 0) {
       const y = city.heightAt(L.x, L.z) + 0.3;
       solid.cyl(L.x, y, L.z, L.r * 0.7, L.r * 0.6, 3, 24, col('#f4f1e8'));
       for (let k = 0; k < 7; k++) {
@@ -598,6 +694,26 @@ export class CityMesh {
       solid.cyl(L.x, y + 45, L.z, 0.5, 0.1, 14, 6, col('#c0c8d0'));
       glow.blob(L.x, y + 59, L.z, 1.4, 1.4, 1.4, col('#ffd23f'));
       if (this.outlines) hull.cyl(L.x, y + 2.8, L.z, L.r * 0.58, L.r * 0.25, 44, 20, 0x000000, false);
+    }
+    // small roundabouts: the round gatehouse of district 4 on the island
+    const gh = kitModel('bld_d4_d');
+    if (gh) for (const nd of city.nodes) {
+      if (!nd.round || (L.r > 0 && Math.hypot(nd.x - L.x, nd.z - L.z) < 1)) continue;
+      const sc = (nd.round * 0.55 * 1.5) / (gh.bounds[3] - gh.bounds[0]);
+      this.bakeKit(gh, nd.x, city.heightAt(nd.x, nd.z) + 0.25, nd.z, 0, sc, sc, sc, false, true);
+    }
+    const kbG = this.kb;
+    if (kbG) {
+      const parts: [KitBatch, THREE.Material, boolean][] = [[kbG.solid, this.matSolid, true], [kbG.glow, this.matGlow, false]];
+      if (this.outlines) parts.push([kbG.hull, hullMaterial(), false]);
+      for (const [b, m, sh] of parts) {
+        const geo = b.build();
+        if (!geo) continue;
+        const mesh = new THREE.Mesh(geo, m);
+        mesh.castShadow = sh && this.shadows; mesh.receiveShadow = this.shadows;
+        gl.add(mesh);
+      }
+      this.kb = null;
     }
     const mk = (gb: GeoBuilder, m: THREE.Material, shadow: boolean): void => {
       if (gb.empty) return;
@@ -623,5 +739,10 @@ export class CityMesh {
 }
 
 function rgb(c: THREE.Color): [number, number, number] { return [c.r, c.g, c.b]; }
+const BLACK = new THREE.Color(0, 0, 0);
+function noisyTint(r: number, g: number, b: number, out: number[]): void {
+  const l = r * 0.3 + g * 0.59 + b * 0.11;
+  out[0] = (r * 0.35 + l * 0.65) * 0.72; out[1] = (g * 0.35 + l * 0.65) * 0.72; out[2] = (b * 0.35 + l * 0.7) * 0.72;
+}
 /** Height contributed by a ramp at a point (to keep the road surface flat under ramps). */
 function rampLocal(city: City, x: number, z: number): number { return city.heightAt(x, z) - city.groundAt(x, z) > 0.2 ? city.heightAt(x, z) - city.groundAt(x, z) : 0; }

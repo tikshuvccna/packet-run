@@ -8,6 +8,7 @@ import type { City } from './city';
 import { CityMesh } from './cityMesh';
 import { Particles, SkidMarks } from './fx';
 import { Sky } from './sky';
+import { kitModel, kitObject, loadKit, partGeometry, setKitMaterials } from './kit';
 import { textTexture, toon, toonGradient } from './toon';
 
 export const QUALITY = {
@@ -33,10 +34,15 @@ export class Scene3D {
   private boxMesh: THREE.InstancedMesh;
   private boxIds: { id: string; x: number; y: number; z: number }[] = [];
   private parcels: { id: string; m: THREE.Object3D }[] = [];
+  private pads: THREE.Object3D[] = [];
+  private coinGlow: THREE.InstancedMesh | null = null;
+  private boxGlow: THREE.InstancedMesh | null = null;
+  private disposed = false;
+  kitLoaded = false;
   private itemMeshes = new Map<number, THREE.Object3D>();
   private raceGroup = new THREE.Group();
   private raceKey = '';
-  private gateMeshes: { key: string; boxes: THREE.Mesh[] }[] = [];
+  private gateMeshes: { key: string; boxes: THREE.Object3D[] }[] = [];
   private labels: HTMLDivElement;
   private labelEls: HTMLDivElement[] = [];
   private fogBase: THREE.Color;
@@ -106,6 +112,7 @@ export class Scene3D {
       m.position.set(p.x, p.y + 0.1, p.z);
       if (e) { const a = city.nodes[e.a]!, b = city.nodes[e.b]!; m.rotation.y = -Math.atan2(b.x - a.x, -(b.z - a.z)); }
       this.scene.add(m);
+      this.pads.push(m);
     }
     for (const p of city.pickups.filter((q) => q.kind === 'parcel')) {
       const g = new THREE.Group();
@@ -132,6 +139,50 @@ export class Scene3D {
       }
     }
     this.resize();
+    setKitMaterials(toon(0xffffff, { vertexColors: true }), toon(0xffffff, { vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.6 }), toonGradient);
+    void loadKit().then(() => { if (!this.disposed) this.onKit(); });
+  }
+
+  /** The art kit arrived: swap code shapes for the models. */
+  private onKit(): void {
+    this.kitLoaded = true;
+    this.cityMesh.kitReady();
+    const swapInst = (old: THREE.InstancedMesh, name: string, scale: number, emissive: string): [THREE.InstancedMesh, THREE.InstancedMesh | null] => {
+      const m = kitModel(name);
+      if (!m || !m.fixed) return [old, null];
+      const geo = partGeometry(m.fixed).scale(scale, scale, scale);
+      const inst = new THREE.InstancedMesh(geo, toon(0xffffff, { vertexColors: true, emissive, emissiveIntensity: 0.25 }), old.count);
+      inst.frustumCulled = false;
+      this.scene.remove(old); this.scene.add(inst);
+      let glow: THREE.InstancedMesh | null = null;
+      if (m.glow) {
+        glow = new THREE.InstancedMesh(partGeometry(m.glow).scale(scale, scale, scale), toon(0xffffff, { vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.7 }), old.count);
+        glow.frustumCulled = false;
+        this.scene.add(glow);
+      }
+      return [inst, glow];
+    };
+    [this.coinMesh, this.coinGlow] = swapInst(this.coinMesh, 'coin', 1.4, '#7a5a00');
+    [this.boxMesh, this.boxGlow] = swapInst(this.boxMesh, 'item_box', 1.2, '#ff7fb0');
+    // nitro pads
+    for (const old of this.pads) {
+      const o = kitObject('nitro_pad');
+      if (!o) break;
+      o.position.copy(old.position); o.position.y -= 0.08;
+      o.rotation.y = old.rotation.y;
+      o.scale.set(0.9, 1, 1.5);
+      this.scene.remove(old); this.scene.add(o);
+    }
+    for (const p of this.parcels) {
+      const o = kitObject('parcel');
+      if (!o) break;
+      o.position.y = 0.6;
+      o.scale.setScalar(1.2);
+      const box = p.m.children[0];
+      if (box) p.m.remove(box);
+      p.m.add(o);
+    }
+    this.raceKey = '';   // rebuild race props with kit gates
   }
 
   resize(): void {
@@ -240,23 +291,27 @@ export class Scene3D {
   private pickups(sim: DriveSim): void {
     const t = this.t;
     this.coinIds.forEach((c, i) => {
-      if (!sim.pickupVisible(c.id, 'coin')) { this.coinMesh.setMatrixAt(i, this.zero); return; }
+      if (!sim.pickupVisible(c.id, 'coin')) { this.coinMesh.setMatrixAt(i, this.zero); this.coinGlow?.setMatrixAt(i, this.zero); return; }
       this.dummy.position.set(c.x, c.y + Math.sin(t * 3 + i) * 0.15, c.z);
       this.dummy.rotation.set(0, t * 3 + i * 0.3, 0);
       this.dummy.scale.setScalar(1);
       this.dummy.updateMatrix();
       this.coinMesh.setMatrixAt(i, this.dummy.matrix);
+      this.coinGlow?.setMatrixAt(i, this.dummy.matrix);
     });
     this.coinMesh.instanceMatrix.needsUpdate = true;
+    if (this.coinGlow) this.coinGlow.instanceMatrix.needsUpdate = true;
     this.boxIds.forEach((c, i) => {
-      if (!sim.pickupVisible(c.id, 'item')) { this.boxMesh.setMatrixAt(i, this.zero); return; }
+      if (!sim.pickupVisible(c.id, 'item')) { this.boxMesh.setMatrixAt(i, this.zero); this.boxGlow?.setMatrixAt(i, this.zero); return; }
       this.dummy.position.set(c.x, c.y + Math.sin(t * 2 + i) * 0.2, c.z);
       this.dummy.rotation.set(0.4, t * 1.5 + i, 0.2);
       this.dummy.scale.setScalar(1);
       this.dummy.updateMatrix();
       this.boxMesh.setMatrixAt(i, this.dummy.matrix);
+      this.boxGlow?.setMatrixAt(i, this.dummy.matrix);
     });
     this.boxMesh.instanceMatrix.needsUpdate = true;
+    if (this.boxGlow) this.boxGlow.instanceMatrix.needsUpdate = true;
     for (const p of this.parcels) { p.m.visible = sim.pickupVisible(p.id, 'parcel'); p.m.rotation.y = t; }
   }
 
@@ -287,6 +342,15 @@ export class Scene3D {
         const arch = (s: number, color: string, start: boolean): void => {
           const p = race.track.sample(s), hw = race.track.pt(p.i).hw + 1.2;
           const y = this.city.heightAt(p.x, p.z);
+          const kg = kitObject('checkpoint_gate', color);
+          if (kg) {
+            const sc = (hw * 2 + 1) / 12;
+            kg.scale.setScalar(sc);
+            kg.position.set(p.x, y, p.z);
+            kg.rotation.y = -Math.atan2(p.dx, -p.dz);
+            this.raceGroup.add(kg);
+            if (!start) return;
+          }
           const g = new THREE.Group();
           const mat = toon(color);
           for (const sd of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.6), mat); post.position.set(sd * hw, 3, 0); g.add(post); }
@@ -295,7 +359,7 @@ export class Scene3D {
           g.add(bar);
           g.position.set(p.x, y, p.z);
           g.rotation.y = -Math.atan2(p.dx, -p.dz);
-          this.raceGroup.add(g);
+          if (!kg) this.raceGroup.add(g);
           if (start) {
             const line = new THREE.Mesh(new THREE.PlaneGeometry(hw * 2, 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: checkerTexture(), depthWrite: false }));
             line.position.set(p.x, y + 0.12, p.z);
@@ -327,16 +391,19 @@ export class Scene3D {
     const cols = ['#e55a4e', '#4a90e2', '#7fd957'];
     for (const g of want) {
       if (this.gateMeshes.some((gm) => gm.key === g.key)) continue;
+      const sp = race.track.sample(g.s);
       const boxes = g.boxes.map((b) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), toon(cols[b.opt] ?? '#fff', { transparent: true, opacity: 0.85, emissive: cols[b.opt], emissiveIntensity: 0.3 }));
-        m.position.set(b.x, this.city.heightAt(b.x, b.z) + 1.3, b.z);
+        const kb = kitObject('answer_box', cols[b.opt] ?? '#fff');
+        const m: THREE.Object3D = kb ?? new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), toon(cols[b.opt] ?? '#fff', { transparent: true, opacity: 0.85, emissive: cols[b.opt], emissiveIntensity: 0.3 }));
+        if (kb) { kb.scale.setScalar(1.1); kb.rotation.y = Math.atan2(sp.dx, sp.dz); }
+        m.position.set(b.x, this.city.heightAt(b.x, b.z) + (kb ? 0.1 : 1.3), b.z);
         m.userData.opt = b.opt;
         this.raceGroup.add(m);
         return m;
       });
       this.gateMeshes.push({ key: g.key, boxes });
     }
-    for (const gm of this.gateMeshes) gm.boxes.forEach((b, i) => { b.rotation.y = this.t + i; b.position.y += Math.sin(this.t * 3 + i) * 0.01; });
+    for (const gm of this.gateMeshes) gm.boxes.forEach((b, i) => { if (!this.kitLoaded) b.rotation.y = this.t + i; b.position.y += Math.sin(this.t * 3 + i) * 0.004; });
     // rival ghost / time trial ghost could go here (not in this slice)
   }
 
@@ -345,41 +412,56 @@ export class Scene3D {
     const race = sim.race;
     const cam = this.chase.cam;
     const p = sim.player;
-    const items: { x: number; y: number; z: number; text: string; color: string }[] = [];
+    const items: { x: number; y: number; z: number; text: string; color: string; sx: number; sy: number; ok: boolean }[] = [];
     if (race) {
       const cols = ['#e55a4e', '#4a90e2', '#3f9a2c'];
       for (const gm of this.gateMeshes) {
         const g = race.groups.find((q) => q.key === gm.key);
         if (!g) continue;
         for (const b of gm.boxes) {
-          if (Math.hypot(b.position.x - p.x, b.position.z - p.z) > 110) continue;
+          if (Math.hypot(b.position.x - p.x, b.position.z - p.z) > 75) continue;
           const opt = b.userData.opt as number;
-          items.push({ x: b.position.x, y: b.position.y + 2, z: b.position.z, text: g.gate.options[opt] ?? '', color: cols[opt] ?? '#333' });
+          items.push({ x: b.position.x, y: b.position.y + (this.kitLoaded ? 2.3 : 2), z: b.position.z, text: g.gate.options[opt] ?? '', color: cols[opt] ?? '#333', sx: 0, sy: 0, ok: false });
         }
       }
     }
     const w = this.container.clientWidth, h = this.container.clientHeight;
+    const small = Math.min(w, h) < 420;
     const v = new THREE.Vector3();
+    for (const it of items) {
+      v.set(it.x, it.y, it.z).project(cam);
+      it.ok = v.z <= 1 && Math.abs(v.x) < 1.2;
+      it.sx = ((v.x + 1) / 2) * w; it.sy = ((1 - v.y) / 2) * h;
+    }
+    // push overlapping labels apart vertically (far boxes project close together)
+    const order = items.filter((it) => it.ok).sort((a, b) => a.sx - b.sx);
+    const lw = (t: string): number => t.length * (small ? 8 : 9.5) + 26;
+    for (let i = 1; i < order.length; i++) {
+      const a = order[i] as (typeof items)[number];
+      for (let j = 0; j < i; j++) {
+        const b = order[j] as (typeof items)[number];
+        if (Math.abs(a.sx - b.sx) < (lw(a.text) + lw(b.text)) / 2 && Math.abs(a.sy - b.sy) < 28) a.sy = b.sy - 30;
+      }
+    }
     while (this.labelEls.length < items.length) {
       const el = document.createElement('div');
-      el.style.cssText = 'position:absolute;transform:translate(-50%,-100%);padding:3px 10px;border-radius:10px;color:#fff;font-weight:700;font-size:15px;white-space:nowrap;direction:rtl;border:2px solid #fff;box-shadow:0 2px 6px #0006';
+      el.style.cssText = `position:absolute;transform:translate(-50%,-100%);padding:2px 9px;border-radius:10px;color:#fff;font-weight:700;font-size:${small ? 12 : 15}px;white-space:nowrap;direction:rtl;border:2px solid #fff;box-shadow:0 2px 6px #0006`;
       this.labels.appendChild(el);
       this.labelEls.push(el);
     }
     this.labelEls.forEach((el, i) => {
       const it = items[i];
-      if (!it) { el.style.display = 'none'; return; }
-      v.set(it.x, it.y, it.z).project(cam);
-      if (v.z > 1) { el.style.display = 'none'; return; }
+      if (!it || !it.ok) { el.style.display = 'none'; return; }
       el.style.display = 'block';
-      el.style.left = `${((v.x + 1) / 2) * w}px`;
-      el.style.top = `${((1 - v.y) / 2) * h}px`;
+      el.style.left = `${it.sx}px`;
+      el.style.top = `${it.sy}px`;
       el.style.background = it.color;
       if (el.textContent !== it.text) el.textContent = it.text;
     });
   }
 
   dispose(): void {
+    this.disposed = true;
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labels.remove();
@@ -388,6 +470,14 @@ export class Scene3D {
 
 function itemMesh(kind: ItemId): THREE.Object3D {
   const c = ITEM_COLORS[kind];
+  const k = kitObject(`item_${kind}`);
+  if (k) {
+    if (kind === 'oil' || kind === 'glue') k.scale.set(1.8, 1, 2.6);
+    if (kind === 'boostpad') k.scale.set(1.6, 1, 2.6);
+    if (kind === 'mine') { k.scale.setScalar(1.4); k.position.y = -0.9; const w = new THREE.Group(); w.add(k); return w; }
+    if (kind === 'smoke') k.scale.setScalar(2.2);
+    return k;
+  }
   switch (kind) {
     case 'oil': case 'glue': {
       const m = new THREE.Mesh(new THREE.CircleGeometry(2.7, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: kind === 'oil' ? 0.85 : 0.75, depthWrite: false }));

@@ -15,6 +15,29 @@ def model(fn):
 
 
 ROTX90 = Matrix.Rotation(math.radians(90), 4, 'X')
+
+
+def glyph_bm(ch, size, depth):
+    """Text glyph -> bmesh centred at origin in XY (extruded along Z, centred)."""
+    import bmesh as _bm
+    cu = bpy.data.curves.new('_g', 'FONT')
+    cu.body = ch
+    cu.size = size
+    cu.extrude = depth / 2
+    cu.resolution_u = 2
+    cu.align_x = 'CENTER'
+    cu.align_y = 'CENTER'
+    ob = bpy.data.objects.new('_g', cu)
+    bpy.context.scene.collection.objects.link(ob)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = ob.evaluated_get(dg).to_mesh()
+    t = _bm.new()
+    t.from_mesh(me)
+    ob.evaluated_get(dg).to_mesh_clear()
+    bpy.data.objects.remove(ob)
+    bpy.data.curves.remove(cu)
+    _bm.ops.triangulate(t, faces=t.faces)
+    return t
 ROTY90 = Matrix.Rotation(math.radians(90), 4, 'Y')
 
 
@@ -64,6 +87,48 @@ def tree_c():
         a = math.tau * k / 3
         b.sphere(0.22, loc=(top.x + 0.3 * math.cos(a), 0.3 * math.sin(a), top.z - 0.3), mat='Coco', seg=8, rings=5)
     b.obj('tree_c')
+
+
+@model
+def tree_d():
+    """Autumn tree (orange/red round canopy), 5 m."""
+    pm()
+    M('Fall', '#f08a3a')
+    M('Fall2', '#e85d4a')
+    b = B()
+    b.cyl(0.2, 2.2, loc=(0, 0, 1.1), r2=0.14, mat='Bark', seg=7)
+    for (x, y, z, r, m) in ((0, 0, 3.3, 1.4, 'Fall'), (0.8, 0.2, 2.8, 0.95, 'Fall2'), (-0.7, -0.3, 2.9, 1.0, 'Fall2'),
+                            (0.1, 0.5, 4.1, 0.9, 'Fall')):
+        b.sphere(r, loc=(x, y, z), mat=m, seg=10, rings=7)
+    b.obj('tree_d')
+
+
+@model
+def tree_e():
+    """Tall cypress, 8 m (narrow, good for avenues)."""
+    pm()
+    M('Dark', '#3f8a5a')
+    b = B()
+    b.cyl(0.15, 1.0, loc=(0, 0, 0.5), mat='Bark', seg=6)
+    b.sphere(1.0, loc=(0, 0, 4.2), scale=(1.0, 1.0, 3.6), mat='Dark', seg=10, rings=9)
+    b.sphere(0.6, loc=(0.3, 0.2, 3.0), scale=(1.0, 1.0, 2.2), mat='Leaf', seg=8, rings=6)
+    b.obj('tree_e')
+
+
+@model
+def tree_f():
+    """Blossom tree (pink canopy, white trunk), 4.5 m."""
+    pm()
+    M('Blossom', '#ff9fc8')
+    M('Blossom2', '#ffd1e4')
+    M('Birch', '#efe8dc')
+    b = B()
+    b.tube([(0, 0, 0), (0.1, 0, 1.4), (-0.2, 0.1, 2.4)], 0.17, 'Birch', seg=7)
+    b.tube([(0.05, 0, 1.3), (0.6, 0.1, 2.3)], 0.1, 'Birch', seg=6)
+    for (x, y, z, r, m) in ((-0.2, 0.1, 3.1, 1.3, 'Blossom'), (0.8, 0.2, 2.8, 0.9, 'Blossom2'), (-0.9, -0.2, 2.7, 0.8, 'Blossom2'),
+                            (0.2, -0.5, 3.7, 0.8, 'Blossom')):
+        b.sphere(r, loc=(x, y, z), scale=(1, 1, 0.85), mat=m, seg=10, rings=7)
+    b.obj('tree_f')
 
 
 @model
@@ -325,16 +390,13 @@ def item_box():
                 size = [0.14, 0.14, 0.14]
                 size[ax] = 1.0
                 b.box(tuple(size), loc=tuple(loc), mat='Edge')
-    # question-mark glyph on all four sides (arc + stem + dot) built from short bars
-    arc = [(0.17 * math.cos(math.pi * 1.05 - i * math.pi * 1.45 / 6), 0.17 + 0.15 * math.sin(math.pi * 1.05 - i * math.pi * 1.45 / 6))
-           for i in range(7)] + [(0.0, -0.05)]
+    # question-mark glyph (Blender's built-in font, extruded) on all four sides
+    g = glyph_bm('?', 0.62, 0.06)
     for k in range(4):
-        R_ = Matrix.Rotation(math.pi / 2 * k, 4, 'Z') @ Matrix.Translation((0, 0.53, 0))
-        for (x0, z0), (x1, z1) in zip(arc, arc[1:]):
-            ln = math.hypot(x1 - x0, z1 - z0)
-            m = R_ @ Matrix.Translation(((x0 + x1) / 2, 0, (z0 + z1) / 2)) @ Matrix.Rotation(-math.atan2(z1 - z0, x1 - x0), 4, 'Y')
-            b.box((ln + 0.1, 0.06, 0.1), mat='Emissive', matrix=m)
-        b.box((0.12, 0.06, 0.12), mat='Emissive', matrix=R_ @ Matrix.Translation((0, 0, -0.25)))
+        t = g.copy()
+        R_ = Matrix.Rotation(math.pi / 2 * k, 4, 'Z') @ Matrix.Translation((0, 0.53, -0.02)) @ Matrix.Rotation(math.pi, 4, 'Z') @ ROTX90
+        b.merge(t, 'Emissive', False, R_)
+    g.free()
     b.obj('item_box')
 
 

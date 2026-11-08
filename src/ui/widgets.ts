@@ -1,6 +1,7 @@
 import type { Widget } from '../learn/types';
 import { rng, shuffle } from '../learn/rng';
 import { btn, flash, h } from './dom';
+import * as sim from './widgetsSim';
 
 export interface WidgetCtx { sfx: (name: string) => void; done: () => void }
 
@@ -15,12 +16,18 @@ export function renderWidget(w: Widget, ctx: WidgetCtx, seed = 1): HTMLElement {
     case 'beam': return beam(w, ctx);
     case 'sort': return sort(w, ctx, seed);
     case 'wrap': return wrap(w, ctx);
+    case 'msglab': return sim.msglab(w, ctx);
+    case 'encode': return sim.encode(w, ctx);
+    case 'cast': return sim.cast(w, ctx);
+    case 'flowsim': return sim.flowsim(w, ctx);
+    case 'journey': return sim.journey(w, ctx);
+    case 'tcpudp': return sim.tcpudp(w, ctx);
   }
 }
 
 type W<T extends Widget['type']> = Extract<Widget, { type: T }>;
 
-function frame(title: string): { root: HTMLElement; body: HTMLElement } {
+export function frame(title: string): { root: HTMLElement; body: HTMLElement } {
   const root = h('div', 'widget');
   root.appendChild(h('div', 'widget-title', title));
   const body = h('div', 'widget-body');

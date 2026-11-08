@@ -5,40 +5,19 @@
   "story": "מעמיסים ומפרקים מכולות בסדר הנכון. עטיפה פנימית קודם, חיצונית אחרונה.",
   "levels": {
     "easy": {
-      "rounds": 8,
       "lives": 4,
-      "timer": 0,
-      "mix": [
-        "wrap",
-        "layer",
-        "port"
-      ],
-      "pass": 6
-    },
-    "medium": {
-      "rounds": 10,
-      "lives": 3,
-      "timer": 16,
-      "mix": [
-        "wrap",
-        "peel",
-        "layer",
-        "port"
-      ],
+      "fallSec": 9,
       "pass": 8
     },
-    "hard": {
-      "rounds": 12,
+    "medium": {
       "lives": 3,
-      "timer": 11,
-      "mix": [
-        "wrap",
-        "peel",
-        "layer",
-        "port",
-        "has"
-      ],
-      "pass": 10
+      "fallSec": 7.5,
+      "pass": 14
+    },
+    "hard": {
+      "lives": 3,
+      "fallSec": 6,
+      "pass": 25
     }
   },
   "pdus": [

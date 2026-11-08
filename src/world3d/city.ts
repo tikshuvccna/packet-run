@@ -9,12 +9,25 @@ import { SURF, type Terrain } from '../drive/sim/car';
 import { clamp, headingOf, segDist, smoothstep, wrapAngle } from '../drive/sim/math';
 import { Rng } from '../drive/sim/rng';
 import { StaticWorld, TAG } from '../drive/sim/statics';
+import { KIT_BOUNDS } from './kitSizes';
+
+/** Building kits per district (art kit). d3_d (arch house) and d4_d (gatehouse) are not lot buildings. */
+export const DISTRICT_KITS: string[][] = [
+  ['bld_d1_a', 'bld_d1_b', 'bld_d1_c', 'bld_d1_d'], ['bld_d2_a', 'bld_d2_b', 'bld_d2_c', 'bld_d2_d'], ['bld_d3_a', 'bld_d3_b', 'bld_d3_c'],
+  ['bld_d4_a', 'bld_d4_b', 'bld_d4_c'], ['bld_d5_a', 'bld_d5_b', 'bld_d5_c', 'bld_d5_d'], ['bld_d6_a', 'bld_d6_b', 'bld_d6_c', 'bld_d6_d'],
+  ['bld_d7_a', 'bld_d7_b', 'bld_d7_c', 'bld_d7_d'],
+];
+export function kitSize(kit: string): [number, number, number] {
+  const b = KIT_BOUNDS[kit];
+  return b ? [b[3] - b[0], b[4] - b[1], b[5] - b[2]] : [12, 10, 12];
+}
 
 export const HALF = 1500;
 const N = 13, S = 230, ORIGIN = -1380;
 const RIVER_HALF = 22;
 const AVENUE_W = 18, STREET_W = 11;
 const RASTER = 4;
+const SITE_SCALE = 1.3;
 
 export interface RoadNode { id: number; x: number; z: number; gi: number; gj: number; round: number; edges: number[]; district: number }
 export interface RoadEdge { id: number; a: number; b: number; avenue: boolean; width: number; bridge: boolean; tunnel: boolean; ramp: boolean; len: number; district: number }
@@ -22,6 +35,8 @@ export type BuildingStyle = 'warehouse' | 'frames' | 'house' | 'doors' | 'cafe' 
 export interface Building {
   id: number; x: number; z: number; w: number; d: number; h: number; rot: number; district: number;
   style: BuildingStyle; kit: string; seed: number; base: number;
+  /** uniform scale of the kit model (its bounds fill w x h x d); the renderer falls back to code shapes without the GLB */
+  ks: number;
   /** unit vector (x,z) of the front face (toward the street) */
   fx: number; fz: number;
 }
@@ -471,7 +486,9 @@ export function generateCity(seed: number): City {
     const side = (tx - (a.x + b.x) / 2) * nx + (tz - (a.z + b.z) / 2) * nz >= 0 ? 1 : -1;
     return { e: best, side };
   };
-  const addSite = (id: string, kind: Poi['kind'], label: string, tx: number, tz: number, kit: string, w: number, d: number, h: number, lesson?: string): void => {
+  const addSite = (id: string, kind: Poi['kind'], label: string, tx: number, tz: number, kit: string, _w: number, _d: number, _h: number, lesson?: string): void => {
+    const [kx, ky, kz] = kitSize(kit);
+    const w = kx * SITE_SCALE, d = kz * SITE_SCALE, h = ky * SITE_SCALE;
     const f = findSite(tx, tz);
     if (!f) return;
     const a = nodes[f.e.a] as RoadNode, b = nodes[f.e.b] as RoadNode;
@@ -557,36 +574,33 @@ export function generateCity(seed: number): City {
       const start = k % 2 === 0 ? 0 : D + 2, end = k % 2 === 0 ? len : len - D - 2;
       let s = start;
       while (s < end - 8) {
-        let wl = style === 'house' ? rng.range(12, 18) : style === 'warehouse' ? rng.range(24, 42) : style === 'tower' ? rng.range(18, 30) : rng.range(14, 30);
-        if (end - s - wl < 10) wl = end - s;
-        const gap = rng.range(1.5, 4);
-        const bw = wl - gap;
-        const setback = style === 'house' || style === 'garden' ? rng.range(3, 6) : rng.range(0, 2);
-        const bd = Math.max(8, D - setback - rng.range(0, style === 'house' ? 6 : 3));
-        const bx = P[0] + ux * (s + wl / 2) + nx * (setback + bd / 2);
-        const bz = P[1] + uz * (s + wl / 2) + nz * (setback + bd / 2);
-        s += wl;
-        if (bw < 6) continue;
-        if (blocked(bx, bz, Math.max(bw, bd) / 2)) continue;
-        if ((style === 'house' || style === 'garden') && rng.next() < 0.3) {
-          props.push({ kind: style === 'garden' ? 'hedge' : 'tree', x: bx, z: bz, y: 0, rot: Math.atan2(uz, ux), s: 1, color: district });
-          continue;
+        const kits = rng.shuffle((DISTRICT_KITS[district - 1] ?? DISTRICT_KITS[3] as string[]).slice());
+        const setback = style === 'house' || style === 'garden' ? rng.range(1, 3) : rng.range(0, 1.5);
+        const gap = rng.range(2, 5);
+        let placed = false;
+        for (const kit of kits.slice(0, 3)) {
+          const [kx, ky, kz] = kitSize(kit);
+          let sc = style === 'tower' ? rng.range(1.5, 2.3) : style === 'frames' || style === 'doors' ? rng.range(1.3, 1.9) : rng.range(1.15, 1.55);
+          sc = Math.min(sc, (D - setback) / kz, (end - s - gap) / kx);
+          if (sc < 0.85) continue;
+          const bw = kx * sc, bd = kz * sc;
+          const bx = P[0] + ux * (s + gap / 2 + bw / 2) + nx * (setback + bd / 2);
+          const bz = P[1] + uz * (s + gap / 2 + bw / 2) + nz * (setback + bd / 2);
+          if (blocked(bx, bz, Math.max(bw, bd) / 2)) { s += bw + gap; placed = true; break; }
+          buildings.push({
+            id: buildings.length, x: bx, z: bz, w: bw, d: bd, h: ky * sc, rot: Math.atan2(uz, ux), district, style,
+            kit, ks: sc, seed: rng.int(0, 1 << 30), base: 0, fx: -nx, fz: -nz,
+          });
+          s += bw + gap;
+          placed = true;
+          break;
         }
-        let h: number;
-        switch (style) {
-          case 'warehouse': h = rng.range(8, 15); break;
-          case 'frames': h = rng.range(12, 30); break;
-          case 'house': h = rng.range(5, 8); break;
-          case 'doors': h = rng.range(14, 38); break;
-          case 'cafe': h = rng.range(7, 16); break;
-          case 'garden': h = rng.range(5, 11); break;
-          default: h = rng.range(26, 72);
+        if (!placed) {
+          // too little room: a tree or two, then move on
+          const x = P[0] + ux * (s + 5) + nx * (setback + 5), z = P[1] + uz * (s + 5) + nz * (setback + 5);
+          if (!blocked(x, z, 2)) props.push({ kind: rng.pick(['tree', 'tree2', 'bush'] as PropKind[]), x, z, y: 0, rot: rng.range(0, 6.28), s: 1, color: district });
+          s += 12;
         }
-        const kitLetter = 'abcdef'[rng.int(0, 5)] ?? 'a';
-        buildings.push({
-          id: buildings.length, x: bx, z: bz, w: bw, d: bd, h, rot: Math.atan2(uz, ux), district, style,
-          kit: `bld_d${district}_${kitLetter}`, seed: rng.int(0, 1 << 30), base: 0, fx: -nx, fz: -nz,
-        });
       }
     }
     // courtyard props
@@ -609,7 +623,7 @@ export function generateCity(seed: number): City {
   }
   // special buildings
   for (const st of sites) {
-    buildings.push({ id: buildings.length, x: st.bx, z: st.bz, w: st.w, d: st.d, h: st.h, rot: st.rot, district: districtAt(st.bx, st.bz), style: 'special', kit: st.kit, seed: 1, base: 0, fx: st.fx, fz: st.fz });
+    buildings.push({ id: buildings.length, x: st.bx, z: st.bz, w: st.w, d: st.d, h: st.h, rot: st.rot, district: districtAt(st.bx, st.bz), style: 'special', kit: st.kit, ks: SITE_SCALE, seed: 1, base: 0, fx: st.fx, fz: st.fz });
   }
   for (const b of buildings) {
     // base: the lowest terrain under the footprint (the mesh extends down into the ground)

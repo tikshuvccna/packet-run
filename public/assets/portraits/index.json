@@ -6,7 +6,7 @@
   "surprised"
  ],
  "who": {
-  "naama": [
+  "barak": [
    "neutral",
    "happy",
    "worried",
@@ -18,19 +18,19 @@
    "worried",
    "surprised"
   ],
-  "uri": [
+  "dina": [
    "neutral",
    "happy",
    "worried",
    "surprised"
   ],
-  "talia": [
+  "gee": [
    "neutral",
    "happy",
    "worried",
    "surprised"
   ],
-  "barak": [
+  "hero_boy": [
    "neutral",
    "happy",
    "worried",
@@ -42,12 +42,30 @@
    "worried",
    "surprised"
   ],
-  "hero_boy": [
+  "naama": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "noise": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "talia": [
+   "neutral",
+   "happy",
+   "worried",
+   "surprised"
+  ],
+  "uri": [
    "neutral",
    "happy",
    "worried",
    "surprised"
   ]
  },
- "note": "512x512 transparent busts, body turned ~24 deg to the viewer's left (flipX to face right)"
+ "note": "512x512 transparent busts, turned ~20 deg to the viewer's left (flipX to face right)"
 }
