@@ -10,4 +10,6 @@ export interface SimCity extends Terrain {
   pickups: SimPickup[];
   nearestRoad(x: number, z: number, heading?: number): { x: number; z: number; heading: number; edge: number; t: number; d: number };
   edgeAt(x: number, z: number): number;
+  /** traffic-light phase offset of a signalised node (undefined = no lights) */
+  signalOffset?(node: number): number | undefined;
 }

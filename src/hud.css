@@ -63,3 +63,24 @@ body.modal .hud { visibility: hidden; }
 .abtn.lookbtn { bottom: 156px; }
 @media (pointer: coarse), (hover: none) { .abtn.act:not(.hidden) { display: block; } .abtn.resetbtn, .abtn.lookbtn { display: block; } }
 @media (max-height: 460px) { .abtn.act { bottom: 100px; right: 112px; width: 64px; height: 64px; } .abtn.resetbtn { bottom: 84px; } .abtn.lookbtn { bottom: 130px; } }
+
+/* portrait phones: lift the speedometer and prompt above the touch controls */
+@media (orientation: portrait) and (max-width: 700px) {
+  .dash { bottom: 124px; }
+  .prompt { bottom: 250px; }
+  .abtn.act { bottom: 240px; right: 14px; }
+  .abtn.resetbtn { bottom: 130px; } .abtn.lookbtn { bottom: 178px; }
+}
+
+/* narrow phones: smaller pads so steering and pedals never overlap (checked at 320 and 360 wide) */
+@media (max-width: 420px) {
+  .steerpad { gap: 6px; }
+  .abtn.arrow { width: 56px; height: 56px; }
+  .abtn.arrow::after { border-width: 12px 18px 12px 0; }
+  .abtn.arrow.right::after { border-width: 12px 0 12px 18px; }
+  .pedals { gap: 6px; }
+  .abtn { width: 46px; height: 46px; font-size: .62rem; }
+  .abtn.gas { width: 68px; height: 68px; font-size: .95rem; }
+  .abtn.act { right: 12px; bottom: 236px; width: 64px; height: 64px; }
+  .abtn.resetbtn, .abtn.lookbtn { width: 56px; height: 34px; font-size: .6rem; }
+}

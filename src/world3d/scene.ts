@@ -8,6 +8,7 @@ import type { City } from './city';
 import { CityMesh } from './cityMesh';
 import { Particles, SkidMarks } from './fx';
 import { Sky } from './sky';
+import { lightState, type Light } from '../drive/sim/lights';
 import { kitModel, kitObject, loadKit, partGeometry, setKitMaterials } from './kit';
 import { textTexture, toon, toonGradient } from './toon';
 
@@ -232,6 +233,8 @@ export class Scene3D {
       this.carFx(d.car, d.kind === 'player', i);
     }
     for (const [id, v] of this.cars) if (!alive.has(id)) { v.dispose(); this.cars.delete(id); }
+    this.ghost(sim);
+    this.trafficLights(sim, dt);
     // camera
     this.chase.mode = sim.race?.state === 'done' ? 'orbit' : look ? 'back' : this.chase.mode === 'garage' ? 'garage' : 'chase';
     this.chase.update(p, dt, this.city.statics);
@@ -261,6 +264,87 @@ export class Scene3D {
     this.scene.traverse((o) => { if (o.userData.billboard) o.quaternion.copy(cam.quaternion); });
     this.renderer.render(this.scene, cam);
     this.updateLabels(sim);
+  }
+
+  private lightPoles = new Map<number, { g: THREE.Group; lamps: { m: THREE.MeshBasicMaterial; axisX: boolean; kind: Light }[] }>();
+  private lightT = 0;
+  private static LAMP_ON: Record<Light, string> = { red: '#ff3b3b', yellow: '#ffd23f', green: '#3bff7a' };
+  /** Traffic-light poles around the player (pooled), lamps follow the sim cycle. */
+  private trafficLights(sim: DriveSim, dt: number): void {
+    const p = sim.player;
+    this.lightT -= dt;
+    if (this.lightT <= 0) {
+      this.lightT = 0.5;
+      const near = new Set<number>();
+      for (const [id] of this.city.signals) {
+        const n = this.city.nodes[id];
+        if (n && Math.abs(n.x - p.x) < 240 && Math.abs(n.z - p.z) < 240) near.add(id);
+      }
+      for (const [id, v] of this.lightPoles) if (!near.has(id)) { this.scene.remove(v.g); this.lightPoles.delete(id); }
+      for (const id of near) {
+        if (this.lightPoles.has(id)) continue;
+        const n = this.city.nodes[id];
+        if (!n) continue;
+        const hw = Math.max(...n.edges.map((e) => (this.city.edges[e]?.width ?? 11) / 2)) + 1.6;
+        const g = new THREE.Group();
+        const lamps: { m: THREE.MeshBasicMaterial; axisX: boolean; kind: Light }[] = [];
+        const y0 = this.city.heightAt(n.x, n.z);
+        for (const [sx, sz, axisX] of [[1, 1, true], [-1, -1, true], [1, -1, false], [-1, 1, false]] as [number, number, boolean][]) {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.2, 6), toon('#3b3f4a'));
+          pole.position.set(n.x + sx * hw, y0 + 2.1, n.z + sz * hw);
+          const box = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.6, 0.55), toon('#2b2f3a'));
+          box.position.set(n.x + sx * hw, y0 + 4.9, n.z + sz * hw);
+          g.add(pole, box);
+          (['red', 'yellow', 'green'] as Light[]).forEach((kind, k) => {
+            const m = new THREE.MeshBasicMaterial({ color: '#333' });
+            const s = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), m);
+            s.position.set(n.x + sx * hw, y0 + 5.4 - k * 0.5, n.z + sz * hw);
+            s.scale.set(1.5, 1, 1.5);
+            g.add(s);
+            lamps.push({ m, axisX, kind });
+          });
+        }
+        this.scene.add(g);
+        this.lightPoles.set(id, { g, lamps });
+      }
+    }
+    for (const [id, v] of this.lightPoles) {
+      const off = this.city.signals.get(id) ?? 0;
+      const sx = lightState(sim.time, off, true), sz = lightState(sim.time, off, false);
+      for (const l of v.lamps) {
+        const on = (l.axisX ? sx : sz) === l.kind;
+        l.m.color.set(on ? Scene3D.LAMP_ON[l.kind] : '#2a2c33');
+      }
+    }
+  }
+
+  private ghostVis: CarVisual | null = null;
+  private ghostMade = false;
+  /** Time-trial ghost: a see-through copy of the player's car on the best run. */
+  private ghost(sim: DriveSim): void {
+    const gp = sim.ghostPose();
+    if (!gp) { if (this.ghostVis) this.ghostVis.root.visible = false; return; }
+    if (!this.ghostVis) {
+      this.ghostVis = new CarVisual(sim.playerDriver.look, { outline: false, shadow: false, detail: false });
+      this.ghostMade = false;
+      this.scene.add(this.ghostVis.root);
+    }
+    const v = this.ghostVis;
+    if (v.isReady && !this.ghostMade) {
+      this.ghostMade = true;
+      v.root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const mat = (m.material as THREE.Material).clone() as THREE.MeshToonMaterial;
+        mat.transparent = true; mat.opacity = 0.35; mat.depthWrite = false;
+        if ('emissive' in mat) { mat.emissive = new THREE.Color('#7fd4ff'); mat.emissiveIntensity = 0.5; }
+        m.material = mat;
+        m.castShadow = false;
+      });
+    }
+    v.root.visible = true;
+    v.root.position.set(gp.x, gp.y, gp.z);
+    v.root.rotation.set(0, -gp.h, 0);
   }
 
   private cleanedSet = new Set<number>();

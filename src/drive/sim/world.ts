@@ -175,7 +175,8 @@ export class DriveSim {
     const pool = RIVALS.filter((r) => r.id !== 'noise');
     const centerIdx = Math.round(def.difficulty * (pool.length - 1));
     const chosen: typeof RIVALS = [];
-    if (def.id === 'grandprix') chosen.push(RIVALS[RIVALS.length - 1] as (typeof RIVALS)[number]);
+    for (const id of def.rivalIds ?? []) { const r = RIVALS.find((q) => q.id === id); if (r && !chosen.includes(r)) chosen.push(r); }
+    if (def.id === 'grandprix' && !chosen.some((r) => r.id === 'noise')) chosen.push(RIVALS[RIVALS.length - 1] as (typeof RIVALS)[number]);
     for (let k = 0; chosen.length < def.rivals && k < 20; k++) {
       const r = pool[clamp(centerIdx + (k % 2 ? 1 : -1) * Math.ceil(k / 2), 0, pool.length - 1)];
       if (r && !chosen.includes(r)) chosen.push(r);
@@ -241,7 +242,7 @@ export class DriveSim {
         }
       } else if (d.traffic) {
         if (Math.hypot(d.car.x - p.x, d.car.z - p.z) > 300 && (Math.floor(this.time * 120) + i) % 2 === 1) continue;   // far traffic: half rate
-        inp = trafficInput(d.traffic, d.car, this.city, this.carsNear(d.car, 26), this.rand);
+        inp = trafficInput(d.traffic, d.car, this.city, this.carsNear(d.car, 26), this.rand, this.time);
       } else inp = NO_INPUT;
       const c = d.car;
       const far = d.kind === 'traffic' && Math.hypot(c.x - p.x, c.z - p.z) > 300;
@@ -258,7 +259,7 @@ export class DriveSim {
       }
       if (d.racer && race && d.racer.stuckT > 3.5) this.resetRival(d);
     }
-    this.drivers = this.drivers.filter((d) => d.car.ghostT < 50);
+    this.drivers = this.drivers.filter((d) => d.kind === 'player' || d.car.ghostT < 50);
 
     // ---- car vs car
     const n = this.drivers.length;
@@ -267,7 +268,7 @@ export class DriveSim {
       for (let j = i + 1; j < n; j++) {
         const b = (this.drivers[j] as Driver).car;
         if (Math.abs(a.x - b.x) > 7 || Math.abs(a.z - b.z) > 7) continue;
-        const v = collideCars(a, b);
+        const v = collideCars(a, b, i === 0 && (this.drivers[j] as Driver).kind === 'rival' ? 2.2 : 1);
         if (v > 3 && (i === 0 || (this.drivers[j] as Driver).kind === 'rival')) this.events.push({ t: 'crash', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, v, driver: i });
         if (v > 4 && i === 0 && race && race.def.kind === 'delivery') this.parcelHit(v);
       }
@@ -501,6 +502,7 @@ export class DriveSim {
         if (rc.lapStart < t) rc.bestLap = Math.min(rc.bestLap, t - rc.lapStart);
       }
     }
+    if (race.state === 'done') return;   // result already sent once
     // places
     const order = race.cars.slice().sort((a, b) => (a.finished && b.finished ? a.finishT - b.finishT : a.finished ? -1 : b.finished ? 1 : b.prog - a.prog));
     order.forEach((rc, i) => (rc.place = i + 1));
@@ -569,6 +571,11 @@ export class DriveSim {
       const place = me.finished ? me.place : total;
       const res = race.finish(place, me.finished ? me.finishT : t, total, Number.isFinite(me.bestLap) ? me.bestLap : t);
       if (race.def.kind === 'drift' && timeUp) { res.medal = race.medalFor(1, t); res.coins = (res.medal === 'none' ? 5 : race.def.reward[res.medal]) + race.coins; }
+      const order = race.cars.slice().sort((a, b) => a.place - b.place);
+      res.standings = order.map((rc) => { const d = this.drivers[rc.driver]; return { name: rc.driver === 0 ? 'player' : d?.name ?? '?', rivalId: d?.rivalId, place: rc.place, player: rc.driver === 0 }; });
+      res.beaten = me.finished ? order.filter((rc) => rc.place > me.place && this.drivers[rc.driver]?.rivalId).map((rc) => this.drivers[rc.driver]?.rivalId as string) : [];
+      if (race.def.kind === 'drift') res.score = Math.round(race.driftScore);
+      if (race.def.kind === 'delivery') res.health = race.health;
       this.lastResult = res;
       this.events.push({ t: 'raceEnd', result: res });
       this.events.push({ t: 'sfx', name: 'finish' });

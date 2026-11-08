@@ -68,7 +68,10 @@ export class ChaseCam {
     if (sp > 30) py += Math.sin(performance.now() * 0.05) * 0.015 * (sp - 30) / 20;
     this.cam.position.set(px, py, pz);
     this.cam.lookAt(lx, ly, lz);
-    const wantFov = 60 + Math.min(16, sp * 0.3) + this.boostLag * 9 + (this.mode === 'garage' ? -14 : 0);
+    let wantFov = 60 + Math.min(16, sp * 0.3) + this.boostLag * 9 + (this.mode === 'garage' ? -14 : 0);
+    // portrait screens: keep roughly the landscape horizontal view (capped)
+    const asp = this.cam.aspect;
+    if (asp < 1.3) wantFov = Math.min(92, (2 * Math.atan(Math.tan((wantFov * Math.PI) / 360) * (1.6 / Math.max(0.45, asp))) * 180) / Math.PI * 0.82);
     this.fov += (wantFov - this.fov) * (k || 1 - Math.exp(-dt * 4));
     if (Math.abs(this.cam.fov - this.fov) > 0.05) { this.cam.fov = this.fov; this.cam.updateProjectionMatrix(); }
   }

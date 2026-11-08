@@ -3,6 +3,7 @@ import type { DriveInput } from '../contract';
 import { type CarState, maxSteerAt } from './car';
 import { clamp, headingOf, wrapAngle } from './math';
 import type { Track } from './track';
+import { lightState } from './lights';
 import type { SimCity } from './types';
 
 /* ------------------------------------------------------------------ racers */
@@ -50,7 +51,7 @@ export function racerInput(ai: RacerAI, c: CarState, others: CarState[], rubber:
     const dx = o.x - c.x, dz = o.z - c.z;
     const fwd = dx * fx + dz * fz, lat = dx * rx + dz * rz;
     if (fwd < -6 || fwd > 32 || Math.abs(lat) > 7) continue;
-    if (Math.abs(lat) < 2.6 && fwd > 0) { if (fwd < blockD) { blockD = fwd; blockV = o.vf; } }
+    if (Math.abs(lat) < 2.9 && fwd > 0) { if (fwd < blockD) { blockD = fwd; blockV = o.vf; } }
     if (fwd > -4 && fwd < 10) { if (lat < 0 && lat > -4.5) leftFree = false; if (lat > 0 && lat < 4.5) rightFree = false; }
   }
   const p = line.sample(ai.s);
@@ -73,7 +74,8 @@ export function racerInput(ai: RacerAI, c: CarState, others: CarState[], rubber:
   // speed target from the line profile (scaled by the car's grip and the driver's skill)
   const sp = line.pt(line.sample(ai.s + 3 + v * 0.3).i);
   let vt = sp.v * Math.sqrt(c.stats.grip) * (0.84 + 0.18 * ai.skill) * rubber;
-  if (blockD < 12 && blockV < v) vt = Math.min(vt, Math.max(0, blockV - 1));
+  // never ram from behind: close the gap only as fast as it can be closed safely
+  if (blockD < 26 && blockV < v) vt = Math.min(vt, blockV + Math.max(0, blockD - 7) * 0.6);
   if (ai.smokeT > 0) vt *= 0.85;
   let throttle = 0, brake = 0;
   if (vt > v + 0.5) throttle = clamp((vt - v) / 2.5, 0.35, 1);
@@ -92,7 +94,7 @@ export function racerInput(ai: RacerAI, c: CarState, others: CarState[], rubber:
 }
 
 /* ------------------------------------------------------------------ traffic */
-export interface TrafficAI { pts: { x: number; z: number; slow: boolean }[]; cur: number; edge: number; to: number; vBase: number; waitT: number }
+export interface TrafficAI { pts: { x: number; z: number; slow: boolean; stop?: number; axisX?: boolean }[]; cur: number; edge: number; to: number; vBase: number; waitT: number }
 
 function laneOff(city: SimCity, edge: number): number { return (city.edges[edge]?.avenue ? 4.4 : 2.5); }
 
@@ -112,6 +114,11 @@ export function extendTraffic(t: TrafficAI, city: SimCity, rng: () => number): v
   for (let k = 0; k <= n; k++) {
     const s = rA + ((len - rA - rB) * k) / n;
     t.pts.push({ x: A.x + ux * s + rxv * lane, z: A.z + uz * s + rzv * lane, slow: false });
+  }
+  // stop line before a signalised node
+  if (city.signalOffset && city.signalOffset(B.id) !== undefined) {
+    const last = t.pts[t.pts.length - 1];
+    if (last) { last.stop = B.id; last.axisX = Math.abs(ux) > Math.abs(uz); }
   }
   // choose the next edge
   const opts = B.edges.filter((id) => id !== t.edge && !city.edges[id]?.ramp);
@@ -142,7 +149,7 @@ export function extendTraffic(t: TrafficAI, city: SimCity, rng: () => number): v
   t.edge = next; t.to = nto;
 }
 
-export function trafficInput(t: TrafficAI, c: CarState, city: SimCity, others: CarState[], rng: () => number): DriveInput {
+export function trafficInput(t: TrafficAI, c: CarState, city: SimCity, others: CarState[], rng: () => number, time = 0): DriveInput {
   // advance the cursor past points that are close or behind
   for (let guard = 0; guard < 8; guard++) {
     const p = t.pts[t.cur];
@@ -157,6 +164,17 @@ export function trafficInput(t: TrafficAI, c: CarState, city: SimCity, others: C
   const steer = steerToward(c, p.x, p.z);
   let vt = t.vBase;
   for (let k = t.cur; k < Math.min(t.pts.length, t.cur + 2); k++) if (t.pts[k]?.slow) vt = Math.min(vt, 8);
+  // traffic lights: stop at the line on red (and on yellow when there is room)
+  for (let k = t.cur; k < Math.min(t.pts.length, t.cur + 3); k++) {
+    const q = t.pts[k];
+    if (!q || q.stop === undefined || !city.signalOffset) continue;
+    const off = city.signalOffset(q.stop);
+    if (off === undefined) continue;
+    const st = lightState(time, off, !!q.axisX);
+    const d = Math.hypot(q.x - c.x, q.z - c.z);
+    if (st === 'red' || (st === 'yellow' && d > 14)) vt = Math.min(vt, Math.max(0, (d - 2) * 0.6));
+    break;
+  }
   // keep distance from anything ahead
   const fx = Math.sin(c.h), fz = -Math.cos(c.h), rx = Math.cos(c.h), rz = Math.sin(c.h);
   for (const o of others) {

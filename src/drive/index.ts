@@ -25,6 +25,8 @@ export interface DriveHandle {
 }
 
 const KEYS = new Set<string>();
+/** keys pressed since the last frame (a tap shorter than a frame still counts) */
+const TAPPED = new Set<string>();
 
 export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
   let sim: DriveSim | null = null;
@@ -51,7 +53,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
   const onKey = (e: KeyboardEvent): void => {
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-    if (e.type === 'keydown') KEYS.add(e.code); else KEYS.delete(e.code);
+    if (e.type === 'keydown') { KEYS.add(e.code); TAPPED.add(e.code); } else KEYS.delete(e.code);
     if (sim && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   };
   window.addEventListener('keydown', onKey);
@@ -62,7 +64,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
   window.addEventListener('resize', onResize);
 
   function readInput(): DriveInput {
-    const k = (c: string): boolean => KEYS.has(c);
+    const k = (c: string): boolean => KEYS.has(c) || TAPPED.has(c);
     const inp: DriveInput = {
       p: 0,
       throttle: k('ArrowUp') || k('KeyW') ? 1 : 0,
@@ -136,6 +138,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     if (dt > 0.25) dt = 0.25;
     fpsS += (1 / Math.max(dt, 1e-3) - fpsS) * 0.05;
     const inp = readInput();
+    TAPPED.clear();
     if (!paused) {
       // POI entry (rising edge)
       if (inp.action && !prevAction && nearPoi && !s.race) bus.emit('drive:poi', { id: nearPoi.id, kind: nearPoi.kind, lesson: nearPoi.lesson, race: nearPoi.race });

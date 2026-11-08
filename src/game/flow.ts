@@ -31,6 +31,9 @@ export class Flow {
   private warned = false;
   private lastPosSave = 0;
   private inModal = false;
+  private inRace = false;
+  private raceCoins = 0;
+  private lastResult = '';
 
   constructor(private ctx: Ctx) {}
 
@@ -101,7 +104,7 @@ export class Flow {
       this.offs.push(
         bus.on('audio:sfx', (e) => this.ctx.audio.sfx(e.name)),
         bus.on('audio:engine', (e) => this.ctx.audio.engine(e.rpm, e.speed, e.boost, e.skid)),
-        bus.on('drive:pickup', (p) => { if (p.kind === 'coin') this.earn(p.amount); else if (p.kind === 'parcel' && p.id && !this.s.parcels[p.id]) { this.s.parcels[p.id] = true; this.earn(20); } }),
+        bus.on('drive:pickup', (p) => { if (p.kind === 'coin') { this.earn(p.amount); if (this.inRace) this.raceCoins += p.amount; } else if (p.kind === 'parcel' && p.id && !this.s.parcels[p.id]) { this.s.parcels[p.id] = true; this.earn(20); } }),
         bus.on('drive:position', (p) => { if (performance.now() - this.lastPosSave > 4000) { this.lastPosSave = performance.now(); this.s.pos = { ...p }; this.ctx.save.save(); } }),
         bus.on('drive:poi', (e) => { void this.onPoi(e); }),
         bus.on('drive:race-end', (r) => { void this.onRaceEnd(r); }),
@@ -163,6 +166,7 @@ export class Flow {
       await this.modal(() => openGarage(this.ctx, 'upgrades'));
     } else if (e.kind === 'race' && e.race) {
       this.ctx.audio.mood('race');
+      this.inRace = true; this.raceCoins = 0; this.lastResult = '';
       this.ctx.bus.emit('drive:start-race', e.race);
     }
   }
@@ -190,10 +194,15 @@ export class Flow {
 
   private async onRaceEnd(r: RaceResult): Promise<void> {
     this.ctx.audio.mood('city');
+    const key = `${r.raceId}:${r.time}`;
+    if (key === this.lastResult) return;          // the engine reports a finish once, but never double count
+    this.lastResult = key;
+    this.inRace = false;
     const prev = this.s.races[r.raceId];
     const order = { none: 0, bronze: 1, silver: 2, gold: 3 } as const;
     if (!prev || order[r.medal] > order[prev.medal] || (r.time < prev.best && r.medal === prev.medal)) this.s.races[r.raceId] = { medal: r.medal, best: r.time };
-    this.earn(r.coins);
+    this.earn(Math.max(0, r.coins - this.raceCoins));   // coins picked up during the race were already counted one by one
+    this.raceCoins = 0;
     if (r.raceId === 'grandprix' && r.place === 1 && !this.s.bossWon) {
       this.s.bossWon = true; this.ctx.save.save();
       this.inModal = true;

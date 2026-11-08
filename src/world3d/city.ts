@@ -68,6 +68,9 @@ export interface City extends Terrain {
   districtAt(x: number, z: number): number;
   nearestRoad(x: number, z: number, heading?: number): { x: number; z: number; heading: number; edge: number; t: number; d: number };
   edgeAt(x: number, z: number): number;
+  /** signalised intersections: node id -> phase offset (s) */
+  signals: Map<number, number>;
+  signalOffset(node: number): number | undefined;
   onRoad(x: number, z: number, margin?: number): boolean;
 }
 
@@ -850,6 +853,16 @@ export function generateCity(seed: number): City {
     races.push({ id: sp.id, he: sp.he, kind: sp.kind, laps: sp.kind === 'sprint' || sp.kind === 'delivery' ? 1 : sp.laps, rivals: sp.rivals, difficulty: sp.difficulty, path, reward: sp.reward, district: sp.district, timeLimit, gatesEvery: sp.gatesEvery ?? 0 });
   }
 
+  /* ---------------- traffic lights: avenue crossings with 3+ roads (no roundabouts, no tunnel) */
+  const signals = new Map<number, number>();
+  for (const n of nodes) {
+    if (n.round || n.edges.length < 3) continue;
+    const es = n.edges.map((id) => edges[id] as RoadEdge);
+    if (!es.some((e) => e.avenue) || es.some((e) => e.tunnel)) continue;
+    if (rng.next() < 0.25) continue;
+    signals.set(n.id, Math.round(rng.range(0, 20) * 10) / 10);
+  }
+
   /* ---------------- POIs */
   const pois: Poi[] = [];
   for (const st of sites) pois.push({ id: st.id, kind: st.kind, district: districtAt(st.x, st.z), x: st.x, z: st.z, radius: 8, label: st.label, lesson: st.lesson });
@@ -871,6 +884,7 @@ export function generateCity(seed: number): City {
   return {
     seed, nodes, edges, buildings, props, ramps, pickups, pois, races, river, riverHalf: RIVER_HALF, mountain, bridges,
     landmark: landmarkNode ? { x: landmarkNode.x, z: landmarkNode.z, r: landmarkNode.round * 0.55 } : { x: 0, z: 0, r: 0 },
+    signals, signalOffset: (id: number) => signals.get(id),
     spawn, coastZ, groundAt: rawHeight, districtAt, nearestRoad, edgeAt, onRoad, heightAt, surfaceAt, statics,
   };
 }

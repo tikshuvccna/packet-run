@@ -298,6 +298,10 @@ describe('world, races and AI (on the real city)', () => {
     }
     expect(res).not.toBeNull();
     expect(res!.place).toBeGreaterThanOrEqual(1);
+    // the result is sent exactly once
+    let again = 0;
+    for (let i = 0; i < 240; i++) { s.step(NO_INPUT); for (const e of s.events) if (e.t === 'raceEnd') again++; s.events.length = 0; }
+    expect(again).toBe(0);
     expect(['gold', 'silver', 'bronze', 'none']).toContain(res!.medal);
   }, 60000);
 

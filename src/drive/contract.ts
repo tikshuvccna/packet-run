@@ -45,6 +45,8 @@ export interface RaceDef {
   laps: number; rivals: number; difficulty: number;   // 0..1
   path: Vec2[];                                       // closed for circuit, open otherwise
   reward: { gold: number; silver: number; bronze: number };
+  /** optional: race exactly these rivals (ids from src/drive/rivals.ts RIVALS, e.g. for the rival ladder) */
+  rivalIds?: string[];
   district: number; timeLimit?: number; gatesEvery?: number; // quiz boxes appear every N meters (0 = none)
 }
 
@@ -89,7 +91,14 @@ export interface HudState {
   driftTier?: number; boosting?: boolean; draft?: number;
 }
 
-export interface RaceResult { raceId: string; place: number; total: number; time: number; coins: number; medal: 'gold' | 'silver' | 'bronze' | 'none'; gatesRight: number; gatesWrong: number; bestLap: number }
+export interface RaceResult {
+  raceId: string; place: number; total: number; time: number; coins: number; medal: 'gold' | 'silver' | 'bronze' | 'none'; gatesRight: number; gatesWrong: number; bestLap: number;
+  /** optional (engine): final order; rivalId is set for named rivals; beaten = rival ids that finished behind the player */
+  standings?: { name: string; rivalId?: string; place: number; player: boolean }[];
+  beaten?: string[];
+  /** optional (engine): drift score, delivery parcel health 0..1 */
+  score?: number; health?: number;
+}
 
 export interface DriveInput {
   p: 0 | 1;

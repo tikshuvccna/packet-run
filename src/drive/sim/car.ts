@@ -408,7 +408,8 @@ export function collideStatic(c: CarState, sw: StaticWorld): number {
 }
 
 /** Car vs car (two circles each) with masses. Returns the impact speed or 0. */
-export function collideCars(a: CarState, b: CarState): number {
+/** bBias > 1 makes b yield more (lighter in the contact): the player vs rivals uses it for fairness. */
+export function collideCars(a: CarState, b: CarState, bBias = 1): number {
   if (a.ghostT > 0 || b.ghostT > 0) return 0;
   if (Math.abs(a.y - b.y) > 2.2) return 0;
   const dx0 = a.x - b.x, dz0 = a.z - b.z;
@@ -418,7 +419,7 @@ export function collideCars(a: CarState, b: CarState): number {
   const ra = ca[4], rb = cb[4];
   let worst = 0;
   const Ia = a.stats.mass * a.dims.a * a.dims.b * 1.05, Ib = b.stats.mass * b.dims.a * b.dims.b * 1.05;
-  const ima = 1 / a.stats.mass, imb = 1 / b.stats.mass;
+  const ima = 1 / a.stats.mass, imb = bBias / b.stats.mass;
   for (let i = 0; i < 2; i++) for (let k = 0; k < 2; k++) {
     const ax = ca[i * 2] as number, az = ca[i * 2 + 1] as number;
     const bx = cb[k * 2] as number, bz = cb[k * 2 + 1] as number;
