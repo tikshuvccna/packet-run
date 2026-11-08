@@ -98,8 +98,10 @@ def _mtx(loc=(0, 0, 0), rot=(0, 0, 0), scale=None):
 def align_mtx(loc, normal, up=(0, 0, 1), spin=0.0):
     """Matrix whose local +Z points along `normal`, located at loc."""
     n = Vector(normal).normalized()
-    q = n.to_track_quat('Z', 'Y' if abs(n.z) > 0.9 else 'Z')
-    m = q.to_matrix().to_4x4()
+    upv = Vector(up) if abs(n.dot(Vector(up))) < 0.95 else Vector((0, 1, 0))
+    x = upv.cross(n).normalized()
+    y = n.cross(x).normalized()
+    m = Matrix((x, y, n)).transposed().to_4x4()   # local X ~ horizontal, local Y ~ up, local Z = normal
     if spin:
         m = m @ Matrix.Rotation(spin, 4, 'Z')
     m.translation = Vector(loc)
@@ -371,7 +373,7 @@ def bbox():
     lo = Vector((1e9, 1e9, 1e9))
     hi = -lo
     for o in bpy.context.scene.objects:
-        if o.type != 'MESH':
+        if o.type != 'MESH' or o.name.startswith('_'):
             continue
         for c in o.bound_box:
             w = o.matrix_world @ Vector(c)
@@ -434,7 +436,13 @@ def _toon_mat(m, ramp=(0.5, 0.78, 1.0)):
     if img:
         tn = nt.nodes.new('ShaderNodeTexImage')
         tn.image = bpy.data.images.load(img, check_existing=True)
-        nt.links.new(tn.outputs['Color'], mul.inputs[6])
+        tint = nt.nodes.new('ShaderNodeMix')
+        tint.data_type = 'RGBA'
+        tint.blend_type = 'MULTIPLY'
+        tint.inputs['Factor'].default_value = 1.0
+        nt.links.new(tn.outputs['Color'], tint.inputs[6])
+        tint.inputs[7].default_value = base
+        nt.links.new(tint.outputs[2], mul.inputs[6])
         mx = nt.nodes.new('ShaderNodeMixShader')
         tr = nt.nodes.new('ShaderNodeBsdfTransparent')
         nt.links.new(tn.outputs['Alpha'], mx.inputs[0])

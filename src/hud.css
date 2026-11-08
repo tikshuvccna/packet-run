@@ -54,3 +54,12 @@ body.modal .hud { visibility: hidden; }
   .screen.title-screen { gap: 8px; } .menu { gap: 6px; } .lh-top .portrait.big { width: 64px; height: 64px; }
 }
 @media (max-width: 480px) { .match { grid-template-columns: 1fr; } .lh-games { grid-template-columns: 1fr; } .hrow { grid-template-columns: 1fr; } .abtn.arrow { width: 70px; height: 70px; } }
+
+/* touch: enter button near a POI, back-to-road and look-back */
+.abtn.act { position: absolute; right: max(120px, calc(env(safe-area-inset-right) + 120px)); bottom: 170px; width: 84px; height: 84px; background: rgba(255, 216, 119, .95); font-size: 1rem; display: none; }
+.abtn.act:not(.hidden) { display: none; }
+.abtn.resetbtn, .abtn.lookbtn { position: absolute; left: max(12px, env(safe-area-inset-left)); width: 64px; height: 40px; border-radius: 12px; font-size: .7rem; background: rgba(255,255,255,.2); display: none; }
+.abtn.resetbtn { bottom: 108px; }
+.abtn.lookbtn { bottom: 156px; }
+@media (pointer: coarse), (hover: none) { .abtn.act:not(.hidden) { display: block; } .abtn.resetbtn, .abtn.lookbtn { display: block; } }
+@media (max-height: 460px) { .abtn.act { bottom: 100px; right: 112px; width: 64px; height: 64px; } .abtn.resetbtn { bottom: 84px; } .abtn.lookbtn { bottom: 130px; } }

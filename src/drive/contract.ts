@@ -65,15 +65,28 @@ export interface DriveConfig {
   quality: 'low' | 'medium' | 'high';
   playerName: string;
   twoPlayers?: boolean;
+  /** pickup ids already collected (coins, hidden parcels) so they stay gone */
+  collected?: string[];
 }
 
 export interface HudState {
   speedKmh: number; nitro: number; nitroCap: number;
   items: ItemId[]; coins: number;
-  race: null | { id: string; he: string; lap: number; laps: number; place: number; total: number; time: number; checkpoint: number; checkpoints: number; gateQuestion?: string };
+  race: null | {
+    id: string; he: string; lap: number; laps: number; place: number; total: number; time: number; checkpoint: number; checkpoints: number; gateQuestion?: string;
+    /** optional extras (engine): 3..1 during the countdown, 0 = go */
+    countdown?: number;
+    /** drift/delivery: seconds left */ timeLeft?: number;
+    /** drift: score */ score?: number;
+    /** delivery: parcel health 0..1 */ health?: number;
+    /** time medals [gold, silver, bronze] in seconds (time trial / solo) */ targets?: [number, number, number];
+    /** the three answers of the upcoming quiz boxes (box 0 is on the right) */ gateOptions?: [string, string, string];
+  };
   heading: number; x: number; z: number;
   nearPoi: { id: string; label: string; kind: PoiKind } | null;
   wrongWay: boolean; drift: number; combo: number;
+  /** optional extras (engine): drift mini-turbo tier 0..3, nitro active, slipstream 0..1 */
+  driftTier?: number; boosting?: boolean; draft?: number;
 }
 
 export interface RaceResult { raceId: string; place: number; total: number; time: number; coins: number; medal: 'gold' | 'silver' | 'bronze' | 'none'; gatesRight: number; gatesWrong: number; bestLap: number }
@@ -88,6 +101,10 @@ export interface DriveInput {
   useItem: boolean;   // held state (rising edge counts)
   look: boolean;      // look back
   reset: boolean;
+  /** optional: enter the POI you stand in (touch button; keyboard E/Enter) */
+  action?: boolean;
+  /** optional: restart the current race (keyboard T) */
+  restart?: boolean;
 }
 
 export const NO_INPUT: DriveInput = { p: 0, throttle: 0, brake: 0, steer: 0, nitro: false, handbrake: false, useItem: false, look: false, reset: false };

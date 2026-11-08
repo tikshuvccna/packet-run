@@ -36,6 +36,10 @@ export interface CarState {
   airborne: boolean; airT: number; lastAir: number;
   // drift
   rearGrip: number; drifting: boolean; driftT: number; driftScore: number; driftChain: number;
+  /** mini-turbo tier reached in the current drift (0..3) and the boost tier released on the last step (0 = none) */
+  driftTier: number; turboOut: number;
+  /** slipstream 0..1 (set by the world each step) */
+  draft: number;
   // effects
   oilT: number; glueT: number; bubbleT: number; ghostT: number; spinDir: number;
   // visuals (springs)
@@ -57,7 +61,7 @@ export function createCar(id: number, carId: CarId, stats: CarStats, x: number, 
     steer: 0, throttle: 0, brakeIn: 0, gear: 0, rpm: 900, shiftT: 0,
     nitro: stats.nitroCap, boosting: false, boostT: 0,
     airborne: false, airT: 0, lastAir: 0,
-    rearGrip: 1, drifting: false, driftT: 0, driftScore: 0, driftChain: 0,
+    rearGrip: 1, drifting: false, driftT: 0, driftScore: 0, driftChain: 0, driftTier: 0, turboOut: 0, draft: 0,
     oilT: 0, glueT: 0, bubbleT: 0, ghostT: 0, spinDir: 1,
     pitch: 0, roll: 0, pitchV: 0, rollV: 0, gPitch: 0, gRoll: 0, wheelSpin: 0, skid: 0, surface: 0,
     lastImpact: 0, impactX: 0, impactZ: 0, stuckT: 0, landImpact: 0,
@@ -87,7 +91,10 @@ function surfaceGrip(surface: number, wheels: WheelId): { grip: number; drag: nu
   return off ? { grip: 0.95, drag: 0.4, top: 0.95 } : { grip: 0.78, drag: 1.6, top: 0.78 };
 }
 
-export interface StepOut { events: string[] }
+/** Maximum front wheel angle at a forward speed (speed sensitive steering). */
+export function maxSteerAt(c: CarState, vf = c.vf): number {
+  return (0.62 / (1 + Math.max(0, Math.abs(vf) - 6) / (c.drifting ? 26 : 17))) * clamp(c.stats.handling, 0.6, 1.6);
+}
 
 /**
  * One fixed step. rng() is used only for item-driven spins (seeded by the owner).
@@ -103,6 +110,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   let vl = c.vx * rx + c.vz * rz;
   const speed = Math.hypot(c.vx, c.vz);
   c.landImpact = 0;
+  c.turboOut = 0;
 
   // ---- timers
   c.oilT = Math.max(0, c.oilT - dt);
@@ -123,7 +131,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   c.throttle = approach(c.throttle, throttleIn, dt * 6);
   c.brakeIn = brakeIn;
   // speed sensitive steering: wide lock when slow, calmer at speed (but drifting keeps more lock for counter-steer)
-  const maxSteer = (0.62 / (1 + Math.max(0, Math.abs(vf) - 6) / (c.drifting ? 26 : 17))) * clamp(st.handling, 0.6, 1.6);
+  const maxSteer = maxSteerAt(c, vf);
   const steerTarget = clamp(inp.steer, -1, 1) * maxSteer;
   const steerRate = (c.drifting ? 5.5 : 3.6) * clamp(st.handling, 0.6, 1.6);
   c.steer = approach(c.steer, steerTarget, steerRate * dt);
@@ -135,7 +143,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   else if (!c.airborne && speed > st.topSpeed * 0.55 && c.surface === SURF.road) c.nitro = Math.min(st.nitroCap, c.nitro + st.nitroRegen * dt);
 
   // ---- engine and gears
-  const topEff = st.topSpeed * sg.top * (c.boosting ? st.nitroPower : 1) * (c.glueT > 0 ? 0.45 : 1);
+  const topEff = st.topSpeed * sg.top * (c.boosting ? st.nitroPower : 1) * (c.glueT > 0 ? 0.45 : 1) * (1 + 0.07 * c.draft);
   const absVf = Math.abs(vf);
   const gTop = (g: number): number => (GEAR_TOP[g] ?? 1) * st.topSpeed;
   if (c.gear < 4 && absVf > gTop(c.gear) * 0.97 && c.throttle > 0.1) { c.gear++; c.shiftT = 0.14; }
@@ -151,20 +159,21 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   let reversing = false;
   if (throttleIn > 0 && vf > -0.5) {
     const lim = speed < topEff ? 1 - Math.pow(speed / topEff, 3) : 0;
-    aDrive = c.throttle * st.accel * torque * (GEAR_MUL[c.gear] ?? 1) * lim;
+    aDrive = c.throttle * st.accel * 0.82 * torque * (GEAR_MUL[c.gear] ?? 1) * lim;
     if (c.shiftT > 0) aDrive *= 0.35;
-    if (c.boosting) aDrive += st.accel * 0.7 * Math.max(0, 1 - speed / topEff) + 3.0;
+    if (c.boosting) aDrive += (st.accel * 0.7 + 3.0) * Math.max(0, 1 - Math.pow(speed / topEff, 3));
   } else if (throttleIn > 0 && vf <= -0.5) {
     aBrake = st.brake * 0.8 * throttleIn;   // throttle while rolling backward = brake
   }
   if (brakeIn > 0) {
-    if (vf > 0.6) aBrake = Math.max(aBrake, st.brake * brakeIn);
+    if (vf > 0.6) aBrake = Math.max(aBrake, st.brake * 0.72 * brakeIn);
     else if (throttleIn <= 0) {
       reversing = true;
       aDrive = -brakeIn * 7 * (vf > -REVERSE_MAX ? 1 - Math.max(0, -vf) / REVERSE_MAX : 0);
     }
   }
-  if (c.boosting && !wantsBoost && c.boostT > 0) aDrive += 5;
+  if (c.boosting && !wantsBoost && c.boostT > 0) aDrive += 5 * Math.max(0, 1 - Math.pow(speed / topEff, 3));
+  if (c.draft > 0 && throttleIn > 0) aDrive += 2.2 * c.draft;
   // over-speed (after nitro) bleed
   const over = speed > topEff ? Math.min(6, (speed / topEff - 1) * 25) : 0;
   const coast = throttleIn === 0 && brakeIn === 0 ? 1.1 : 0;
@@ -178,19 +187,19 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
     c.x += c.vx * dt; c.z += c.vz * dt; c.y += c.vy * dt;
     c.h = wrapAngle(c.h + c.r * dt);
     const gy = t.heightAt(c.x, c.z);
-    c.pitchV += (-0.25 - c.pitch) * dt * 2;   // nose dips slowly
+    c.pitchV += (0.18 - c.pitch) * dt * 2;    // nose dips slowly (visual pitch > 0 = nose down)
     c.pitch += c.pitchV * dt;
     if (c.y <= gy) {
       c.landImpact = Math.max(0.1, -c.vy);
       c.y = gy; c.vy = 0; c.airborne = false; c.lastAir = c.airT;
       if (c.airT > 0.35) c.nitro = Math.min(st.nitroCap, c.nitro + Math.min(1, c.airT * 0.5));
       c.airT = 0;
-      c.pitchV -= c.landImpact * 0.12;
+      c.pitchV += c.landImpact * 0.08;
       // land facing a little more along velocity (forgiving)
       const vh = Math.atan2(c.vx, -c.vz);
       if (speed > 5 && Math.abs(wrapAngle(vh - c.h)) < 0.5) c.h = wrapAngle(c.h + wrapAngle(vh - c.h) * 0.5);
     }
-    updateDerived(c);
+    updateDerived(c, dt);
     return;
   }
 
@@ -237,14 +246,14 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   Fx += FlongF;
   let Fy = FlatF + FyR;
   // arcade drift helper: in a held drift, push gently forward so the slide keeps its speed
-  if (c.drifting && throttleIn > 0.3) Fx += m * Math.min(4.5, Math.abs(c.slip) * 9) * c.throttle;
+  if (c.drifting && throttleIn > 0.3) Fx += m * Math.min(4.5, Math.abs(c.slip) * 9) * c.throttle * Math.max(0, 1 - speed / (topEff * 0.85));
 
-  let torque = d.a * FlatF - d.b * FyR;
+  let yawT = d.a * FlatF - d.b * FyR;
   // yaw damping (stability) when not drifting
-  if (!c.drifting && !hb) torque -= c.r * I * 1.4 * clamp(speed / 30, 0, 1);
+  if (!c.drifting && !hb) yawT -= c.r * I * 1.4 * clamp(speed / 30, 0, 1);
   // oil spin
-  if (c.oilT > 0) torque += c.spinDir * I * 3.2;
-  if (c.bubbleT > 0) torque += c.spinDir * I * 5;
+  if (c.oilT > 0) yawT += c.spinDir * I * 3.2;
+  if (c.bubbleT > 0) yawT += c.spinDir * I * 5;
 
   // integrate velocity in the body frame then convert
   let newVf = vf + (Fx / m) * dt;
@@ -252,7 +261,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   const bdv = (brakeF / m) * dt;
   if (Math.abs(newVf) <= bdv) newVf = reversing ? newVf : 0; else newVf -= Math.sign(newVf) * bdv;
   let newVl = vl + (Fy / m) * dt;
-  let newR = c.r + (torque / I) * dt;
+  let newR = c.r + (yawT / I) * dt;
 
   // low speed: blend toward the kinematic bicycle (no jitter at a stop)
   const k = clamp((speed - 1.5) / 5, 0, 1);
@@ -263,14 +272,17 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   // drift state + spin protection
   const slip = speed > 3 ? Math.atan2(newVl, Math.abs(newVf)) : 0;
   if (!c.drifting && speed > 11 && Math.abs(slip) > 0.17 && (hb || tapDrift || c.rearGrip < 0.8)) {
-    c.drifting = true; c.driftT = 0;
+    c.drifting = true; c.driftT = 0; c.driftTier = 0;
   }
   if (c.drifting) {
     c.driftT += dt;
     if (speed < 7 || (Math.abs(slip) < 0.07 && c.rearGrip > 0.9) || c.lastImpact > 0.6) {
       if (c.driftT > 0.6) c.driftChain++;
-      c.drifting = false;
+      // mini-turbo: release the tier reached (not after a crash)
+      if (c.driftTier > 0 && c.lastImpact <= 0.6) { c.turboOut = c.driftTier; c.boostT = Math.max(c.boostT, [0, 0.55, 0.95, 1.5][c.driftTier] ?? 0); }
+      c.drifting = false; c.driftTier = 0;
     } else {
+      c.driftTier = c.driftT > 2.6 ? 3 : c.driftT > 1.6 ? 2 : c.driftT > 0.8 ? 1 : 0;
       c.driftScore += Math.abs(slip) * speed * dt * 2;
       c.nitro = Math.min(st.nitroCap, c.nitro + dt * 0.3);
     }
@@ -298,13 +310,21 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   if (c.surface !== SURF.road) c.skid *= 0.5;
 
   // ---- vertical: follow the ground, launch when it falls away faster than gravity
+  // ground vertical speed from the slope along the travel direction (robust to small steps in the height field)
   const gy = t.heightAt(c.x, c.z);
-  const groundVy = (gy - c.y) / dt;
-  if (c.vy > groundVy + 2.2 && speed > 8) {
+  const sp = Math.hypot(c.vx, c.vz);
+  // vertical speed from the slope just travelled (back window); take off when the road ahead falls away faster
+  let groundVy = 0, aheadVy = 0;
+  if (sp > 0.5) {
+    const win = Math.max(1.5, sp * 0.08), k = win / sp;
+    groundVy = clamp(((gy - t.heightAt(c.x - c.vx * k, c.z - c.vz * k)) / win) * sp, -25, 25);
+    aheadVy = clamp(((t.heightAt(c.x + c.vx * k, c.z + c.vz * k) - gy) / win) * sp, -25, 25);
+  }
+  if (c.vy > aheadVy + 2.5 && speed > 8 && gy <= c.y + 0.01) {
     c.airborne = true; c.airT = 0;
-    c.y += c.vy * dt;
+    c.y = Math.max(gy, c.y + c.vy * dt);
   } else {
-    c.vy = clamp(groundVy, -30, 30);
+    c.vy = groundVy;
     c.y = gy;
   }
 
@@ -320,16 +340,15 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   const hR = t.heightAt(c.x + rx * d.track * 0.5, c.z + rz * d.track * 0.5), hL = t.heightAt(c.x - rx * d.track * 0.5, c.z - rz * d.track * 0.5);
   c.gPitch = lerp(c.gPitch, Math.atan2(hf - hr, L), clamp(dt * 20, 0, 1));
   c.gRoll = lerp(c.gRoll, Math.atan2(hR - hL, d.track), clamp(dt * 20, 0, 1));
-  updateDerived(c);
+  updateDerived(c, dt);
 }
 
-function updateDerived(c: CarState): void {
+function updateDerived(c: CarState, dt = 0): void {
   const fx = Math.sin(c.h), fz = -Math.cos(c.h);
   c.vf = c.vx * fx + c.vz * fz;
   c.vl = c.vx * Math.cos(c.h) + c.vz * Math.sin(c.h);
   c.speed = Math.hypot(c.vx, c.vz);
-  c.wheelSpin += (c.vf / c.dims.wheelR) * (1 / 120);
-  if (c.wheelSpin > 1000) c.wheelSpin -= 1000 - (1000 % (Math.PI * 2));
+  c.wheelSpin = (c.wheelSpin + (c.vf / c.dims.wheelR) * dt) % (Math.PI * 2);
 }
 
 /* ------------------------------------------------------------ collisions */
@@ -443,4 +462,6 @@ export function applyOil(c: CarState, rng: () => number): void { c.oilT = 1.3; c
 export function applyGlue(c: CarState): void { c.glueT = 1.6; }
 export function applyBoost(c: CarState, sec: number): void { c.boostT = Math.max(c.boostT, sec); }
 export function applyBubble(c: CarState, rng: () => number): void {
-  c.bubbleT = 1.1; 
+  c.bubbleT = 1.1; c.spinDir = rng() < 0.5 ? -1 : 1;
+  c.vx *= 0.45; c.vz *= 0.45; c.vy = 6.5; c.airborne = true; c.airT = 0; c.y += 0.05;
+}

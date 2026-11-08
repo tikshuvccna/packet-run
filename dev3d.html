@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><title>Packet Run 3D dev</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#cfe6f5;font-family:Rubik,"Segoe UI",Arial,sans-serif}
+#game{position:fixed;inset:0}
+#hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 3px #0008}
+#speed{position:absolute;left:18px;bottom:16px;font-size:44px;font-weight:800;direction:ltr}
+#speed small{font-size:16px;opacity:.8}
+#nitro{position:absolute;left:18px;bottom:76px;width:180px;height:12px;border:2px solid #fff;border-radius:8px;overflow:hidden;background:#0005}
+#nitro i{display:block;height:100%;background:linear-gradient(90deg,#2dc4e8,#a6f3ff)}
+#drift{position:absolute;left:18px;bottom:96px;font-size:18px;font-weight:800}
+#items{position:absolute;right:18px;bottom:16px;font-size:20px;font-weight:700;background:#0006;padding:6px 12px;border-radius:12px}
+#race{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:700;background:#0006;padding:6px 16px;border-radius:12px;text-align:center;white-space:nowrap}
+#q{position:absolute;top:64px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:700;background:#1b1f2acc;padding:8px 18px;border-radius:12px;border:2px solid #ffd23f;display:none;max-width:90vw;text-align:center}
+#toast{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:800;transition:opacity .4s;opacity:0}
+#prompt{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:700;background:#0008;padding:6px 14px;border-radius:12px;display:none}
+#mini{position:absolute;top:12px;right:12px;width:170px;height:170px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px #0006}
+#dbg{position:absolute;bottom:4px;right:200px;font:11px monospace;color:#123;text-shadow:none;background:#fff8;padding:2px 6px;direction:ltr}
+#keys{position:absolute;top:190px;right:12px;font-size:12px;background:#0006;padding:6px 10px;border-radius:10px;line-height:1.5}
+</style></head>
+<body><div id="game"></div>
+<div id="hud"><div id="race"></div><div id="q"></div><div id="toast"></div><div id="prompt"></div>
+<div id="drift"></div><div id="nitro"><i></i></div><div id="speed">0 <small>km/h</small></div><div id="items"></div>
+<canvas id="mini" width="340" height="340"></canvas><div id="keys"></div><div id="dbg"></div></div>
+<script type="module" src="/src/dev3d.ts"></script></body>
+</html>

@@ -36,6 +36,13 @@ export class Flow {
 
   private get s() { return this.ctx.save.data; }
   setCity(c: CityInfo): void { this.city = c; }
+  /** Where the minimap arrow points: the garage of the next lesson, or the grand prix when all lessons are done. */
+  objective(): { x: number; z: number } | null {
+    const lesson = nextLesson(this.s);
+    const id = lesson ? this.city?.lessonPoi(lesson) : 'race_grandprix';
+    const p = id ? this.city?.poiPos(id) : null;
+    return p ? { x: p.x, z: p.z } : null;
+  }
 
   async boot(): Promise<void> {
     for (;;) {

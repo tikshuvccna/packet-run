@@ -30,6 +30,7 @@ export class Hud {
   private lastSend = 0;
   private autoGas = true;
   private last: HudState | null = null;
+  private actBtn!: HTMLButtonElement;
 
   constructor(private bus: Bus, onPause: () => void, opts: { autoGas?: boolean } = {}) {
     this.autoGas = opts.autoGas ?? true;
@@ -79,8 +80,11 @@ export class Hud {
     const drift = this.holdBtn('abtn drift', 'דריפט', () => { this.input.handbrake = true; }, () => { this.input.handbrake = false; });
     pedals.append(nit, item, drift, brake, gas);
     if (this.autoGas) this.input.throttle = 1;
+    this.actBtn = this.holdBtn('abtn act hidden', 'כניסה', () => { this.input.action = true; }, () => { this.input.action = false; });
+    const back = this.holdBtn('abtn resetbtn', 'חזרה לכביש', () => { this.input.reset = true; }, () => { this.input.reset = false; });
+    const look = this.holdBtn('abtn lookbtn', 'מאחור', () => { this.input.look = true; }, () => { this.input.look = false; });
 
-    r.append(top, this.banner, this.wrongWay, this.comboEl, this.promptEl, this.toasts, dash, steer, pedals);
+    r.append(top, this.banner, this.wrongWay, this.comboEl, this.promptEl, this.toasts, dash, steer, pedals, this.actBtn, back, look);
 
     this.offs.push(
       bus.on('drive:hud', (s) => this.update(s)),
@@ -107,6 +111,7 @@ export class Hud {
       i.style.borderColor = ITEM_COLOR[it];
       this.itemsEl.appendChild(i);
     }
+    this.actBtn.classList.toggle('hidden', !s.nearPoi || !!s.race);
     this.wrongWay.classList.toggle('hidden', !s.wrongWay);
     this.comboEl.textContent = s.combo > 1 ? `קומבו ${s.combo}` : '';
     this.comboEl.classList.toggle('hidden', s.combo <= 1);
