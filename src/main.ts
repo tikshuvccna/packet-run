@@ -18,6 +18,7 @@ const CITY_SEED = 11;                       // the same seed the flow gives the 
 const city = buildCity(CITY_SEED);
 flow.setCity({
   lessonPoi: (id) => `garage_${id}`,
+  poiRaw: (id) => { const p = city.pois.find((x) => x.id === id); return p ? { x: p.x, z: p.z, label: p.label } : null; },
   poiPos: (id) => {
     const p = city.pois.find((x) => x.id === id);
     if (!p) return null;

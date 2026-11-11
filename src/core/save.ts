@@ -34,6 +34,8 @@ export interface SaveData {
   races: Record<string, { medal: 'gold' | 'silver' | 'bronze' | 'none'; best: number }>;
   pos: { x: number; z: number; heading: number } | null;
   bossWon: boolean;
+  /** main story: index of the current mission and of its current step */
+  mission: { idx: number; step: number };
   playSeconds: number;
   settings: { quality: 'auto' | 'low' | 'medium' | 'high'; showFps: boolean; musicOn: boolean; sfxOn: boolean; musicVol: number; sfxVol: number };
 }
@@ -48,7 +50,7 @@ export function emptySave(): SaveData {
     upgrades: { engine: 0, nitro: 0, tires: 0, brakes: 0, armor: 0, slots: 0 },
     cars: ['van'], wheels: ['std'], vinyls: [],
     look: { car: 'van', paint: '#f2b134', vinyl: null, vinylColor: '#ffffff', wheels: 'std', rim: '#d8dde3', spoiler: false },
-    lessons: {}, flags: {}, parcels: {}, races: {}, pos: null, bossWon: false, playSeconds: 0,
+    lessons: {}, flags: {}, parcels: {}, races: {}, pos: null, bossWon: false, mission: { idx: 0, step: 0 }, playSeconds: 0,
     settings: { quality: 'auto', showFps: false, musicOn: true, sfxOn: true, musicVol: 0.5, sfxVol: 0.8 },
   };
 }
@@ -67,6 +69,7 @@ export function normalize(raw: unknown): SaveData {
     wheels: Array.isArray(r.wheels) && r.wheels.length ? r.wheels : base.wheels,
     vinyls: Array.isArray(r.vinyls) ? r.vinyls : base.vinyls,
     settings: { ...base.settings, ...(r.settings ?? {}) },
+    mission: { ...base.mission, ...(r.mission ?? {}) },
   };
 }
 

@@ -10,6 +10,7 @@ import type { CarId, CarLook, VinylId, WheelId } from '../drive/contract';
 import type { CarState } from '../drive/sim/car';
 import { CAR_DIMS } from '../drive/sim/cars';
 import { outlineMat, toon, toonGradient } from './toon';
+import { kitObject, loadKit } from './kit';
 
 export interface CarTemplate {
   fixed: THREE.BufferGeometry | null; paint: THREE.BufferGeometry | null; lights: THREE.BufferGeometry | null;
@@ -245,6 +246,7 @@ export class CarVisual {
   private wheelR = 0.34;
   private ready = false;
   bubble: THREE.Mesh | null = null;
+  private moto = false;
 
   constructor(look: CarLook, readonly opts: { outline: boolean; shadow: boolean; detail: boolean }) {
     this.look = { ...look };
@@ -258,6 +260,11 @@ export class CarVisual {
   get isReady(): boolean { return this.ready; }
 
   private async build(look: CarLook): Promise<void> {
+    if (look.extra === 'moto') {
+      await loadKit();
+      const o = kitObject('moto', look.paint);
+      if (o) { this.body.clear(); this.body.add(o); this.moto = true; this.ready = true; return; }
+    }
     const tpl = await carTemplate(look.car);
     if (this.look.car !== look.car) return;
     this.tpl = tpl;
@@ -297,6 +304,11 @@ export class CarVisual {
     await this.setWheels(look.wheels);
     this.apply(look);
     this.ready = true;
+    if (look.extra === 'taxi' || look.extra === 'police') {
+      await loadKit();
+      const o = kitObject(look.extra === 'taxi' ? 'taxi_sign' : 'police_bar');
+      if (o) { o.position.set(0, CAR_DIMS[look.car].height - 0.06, 0.1); this.body.add(o); }
+    }
   }
 
   private async setWheels(id: WheelId): Promise<void> {
@@ -322,6 +334,7 @@ export class CarVisual {
   apply(look: CarLook): void {
     const prev = this.look;
     this.look = { ...look };
+    if (this.moto) return;
     if (prev.car !== look.car || !this.tpl) { this.ready = false; void this.build(look); return; }
     this.paintMat.color.set(look.paint);
     this.rimMat.color.set(look.rim);
@@ -338,7 +351,7 @@ export class CarVisual {
   update(c: CarState, t: number, steerVis = c.steer): void {
     this.root.position.set(c.x, c.y, c.z);
     this.root.rotation.set(0, -c.h, 0);
-    this.body.rotation.set(c.gPitch - c.pitch, 0, c.gRoll + c.roll, 'YXZ');
+    this.body.rotation.set(c.gPitch - c.pitch, 0, c.gRoll + c.roll + (this.moto ? Math.max(-0.5, Math.min(0.5, -c.r * c.speed * 0.035)) : 0), 'YXZ');
     this.body.position.y = 0.02 + Math.sin(t * 30) * 0.004 * Math.min(1, c.speed / 20);
     const spin = -c.wheelSpin * (0.34 / this.wheelR);
     this.spins.forEach((s) => (s.rotation.x = spin));

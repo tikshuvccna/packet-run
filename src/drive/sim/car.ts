@@ -128,7 +128,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   // ---- input shaping
   const throttleIn = clamp(inp.throttle, 0, 1);
   const brakeIn = clamp(inp.brake, 0, 1);
-  c.throttle = approach(c.throttle, throttleIn, dt * 6);
+  c.throttle = approach(c.throttle, inp.reverse !== undefined && throttleIn > 0 ? Math.max(throttleIn, 0.85) : throttleIn, dt * 6);
   c.brakeIn = brakeIn;
   // speed sensitive steering: wide lock when slow, calmer at speed (but drifting keeps more lock for counter-steer)
   const maxSteer = maxSteerAt(c, vf);
@@ -157,15 +157,29 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   let aDrive = 0;
   let aBrake = 0;
   let reversing = false;
+  // gearbox mode (touch lever): `reverse` is given, so the brake only brakes and the lever position caps the cruise speed
+  const lever = inp.reverse !== undefined;
+  const revIn = clamp(inp.reverse ?? 0, 0, 1);
+  const capV = lever ? topEff * (0.25 + 0.75 * throttleIn) : topEff;
   if (throttleIn > 0 && vf > -0.5) {
-    const lim = speed < topEff ? 1 - Math.pow(speed / topEff, 3) : 0;
+    const lim = speed < capV ? 1 - Math.pow(speed / capV, 3) : 0;
     aDrive = c.throttle * st.accel * 0.82 * torque * (GEAR_MUL[c.gear] ?? 1) * lim;
     if (c.shiftT > 0) aDrive *= 0.35;
     if (c.boosting) aDrive += (st.accel * 0.7 + 3.0) * Math.max(0, 1 - Math.pow(speed / topEff, 3));
   } else if (throttleIn > 0 && vf <= -0.5) {
     aBrake = st.brake * 0.8 * throttleIn;   // throttle while rolling backward = brake
   }
-  if (brakeIn > 0) {
+  if (lever) {
+    if (brakeIn > 0) aBrake = Math.max(aBrake, st.brake * 0.72 * brakeIn);
+    if (revIn > 0) {
+      if (vf > 0.6) aBrake = Math.max(aBrake, st.brake * 0.72 * revIn);
+      else if (brakeIn <= 0) {
+        reversing = true;
+        const rmax = REVERSE_MAX * (0.4 + 0.6 * revIn);
+        aDrive = -revIn * 7 * (vf > -rmax ? 1 - Math.max(0, -vf) / rmax : 0);
+      }
+    }
+  } else if (brakeIn > 0) {
     if (vf > 0.6) aBrake = Math.max(aBrake, st.brake * 0.72 * brakeIn);
     else if (throttleIn <= 0) {
       reversing = true;
@@ -176,7 +190,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   if (c.draft > 0 && throttleIn > 0) aDrive += 2.2 * c.draft;
   // over-speed (after nitro) bleed
   const over = speed > topEff ? Math.min(6, (speed / topEff - 1) * 25) : 0;
-  const coast = throttleIn === 0 && brakeIn === 0 ? 1.1 : 0;
+  const coast = (throttleIn === 0 && brakeIn === 0 && revIn === 0) || (lever && speed > capV + 1 && vf > 0) ? 1.1 + (lever && speed > capV + 1 ? 3 : 0) : 0;
   const aRes = 0.18 + 0.00022 * speed * speed + sg.drag * Math.min(1, speed / 10) + over + coast + (c.glueT > 0 ? 4 : 0);
 
   if (c.airborne) {

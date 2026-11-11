@@ -203,36 +203,97 @@ def racing_stripes(h, color="#ffffff"):
     ellipsoid("badge", 0.03, mat("#ffd166", kind='soft'), up, loc=(-0.1 * W, -0.19 * W, th * 0.72), scale=(1, 0.4, 1))
 
 
+def open_helmet(h, color, color2, z_front=0.6, peak=True, stripe=True, number=None):
+    """Open-face racing helmet (the face stays visible), with a peak and a centre stripe."""
+    R = h.R
+    hp = h.P['head']
+    sm = mat(color, kind='soft', rim=0.75)
+
+    def deform(p):
+        x, y, z = p.x, p.y, p.z
+        front = _sm(-0.05, -0.45, y)
+        zcut = (z_front - 0.3 * x * x) * front + (-0.5) * (1 - front)
+        k = _sm(-0.015, 0.05, zcut - z)
+        q = p * (1 - 0.4 * k)
+        if y > 0.0:
+            q.y += 0.1 * y
+        return q
+    o = blob("helmet", R * 1.3, sm, hp, loc=(0, R * 0.06, R * 0.06), scale=(1.0, 1.03, 1.0), seg=96, rings=64, deform=deform)
+    m2 = mat(color2, kind='soft', rim=0.6)
+    # rolled rim around the face opening
+    pts = []
+    for i in range(17):
+        x = -0.95 + 1.9 * i / 16
+        z = z_front - 0.3 * x * x - 0.02
+        y = -math.sqrt(max(0.0, 1 - x * x - z * z)) * 1.03
+        pts.append(Vector((x * R * 1.3, y * R * 1.3 + R * 0.06, (z + 0.02) * R * 1.3 + R * 0.06)))
+    tube("helm_rim", pts, [R * 0.06], m2, hp, seg=10, sub=2)
+    if stripe:
+        for dx in ((-0.1, 0.1) if number is None else (0.0,)):
+            sp_ = [Vector((dx * R, -1.34 * R * math.cos(a) + R * 0.06, 1.33 * R * math.sin(a) + R * 0.06)) for a in
+                   [math.radians(d) for d in range(42, 171, 12)]]
+            tube("helm_stripe", sp_, [0.06 * R], m2, hp, seg=6, sub=2, flat=0.4, line=False)
+    if peak:
+        blob("helm_peak", R, m2, hp, loc=(0, -R * 1.05, R * 0.86), scale=(0.8, 0.55, 0.07),
+             deform=lambda p: Vector((p.x, min(p.y, 0.3), p.z)), rot=(-0.3, 0, 0), seg=32, rings=12)
+    for s in (-1, 1):   # side pads
+        ellipsoid("helm_pad", R * 0.3, m2, hp, loc=(s * R * 1.2, R * 0.1, -R * 0.1), scale=(0.3, 1, 1), seg=16, rings=10)
+    return o
+
+
+def _sm(e0, e1, x):
+    t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+    return t * t * (3 - 2 * t)
+
+
+def helmet_goggles(h, frame="#2b2d36", lens="#ffd166", z=0.78):
+    R = h.R
+    hp = h.P['head']
+    fm = mat(frame, kind='soft')
+    lm = mat(lens, kind='soft', rim=0.9)
+    for s in (-1, 1):
+        cx, cz = s * 0.34 * R, z * R
+        y = -math.sqrt(max(0.0, 1.0 - 0.34 ** 2 - z ** 2)) * R * 1.3 + R * 0.06 - 0.03
+        tube("gog_rim", ring_pts(cx, cz, y, 0.24 * R, rz=0.18 * R), [0.04 * R], fm, hp, seg=6, sub=1)
+        ellipsoid("gog_lens", 0.22 * R, lm, hp, loc=(cx, y + 0.01, cz), scale=(1, 0.35, 0.78))
+
+
 def hero_girl():
-    sp = dict(skin=SKIN['a'], R=0.25, iris="#4a6a8a", brow_col="#2a1a14", lip="#c0565a", blush_amt=0.5,
-              head=dict(jaw=0.3, cheek=0.05, nose=0.07, chin=0.05), eye_h=0.16, flick=1.2)
-    h = Human(sp)
-    h.feet_only(shoe="#3a2a2a")
-    h.skirt("#2f3a5a", pat='weave', P=dict(nu=60, fv=80), hem="#4ad6c8", flare=1.0, folds=11)
-    h.torso("#e8443a", pat='weave', P=dict(nu=40, fv=80), collar="#2b2d36", belt="#2b2d36", buttons=("#f6f4ee", 3))
-    racing_stripes(h)
-    h.arms("#e8443a", cuff="#2b2d36", P=dict(nu=18, fv=90), glove="#2b2d36")
+    """Rider look: coral open helmet with goggles over a lilac headscarf, sunny yellow jacket, long navy skirt."""
+    sp = dict(skin=SKIN['e'], R=0.25, iris="#6a4424", brow_col="#3a2418", lip="#b85a52", blush_amt=0.55, freckles=True,
+              head=dict(jaw=0.34, cheek=0.1, nose=0.09, chin=0.03), eye_h=0.15, eye_w=0.125, flick=0.8)
+    h = Human(dict(sp, H=0.98))
+    h.feet_only(shoe="#f2f0ea")
+    h.skirt("#27314f", pat='weave', P=dict(nu=60, fv=80), hem="#ff7a59", flare=1.0, folds=11)
+    h.torso("#ffc93c", pat='weave', P=dict(nu=40, fv=80), collar="#27314f", belt="#27314f")
+    h.arms("#ffc93c", cuff="#ff7a59", P=dict(nu=18, fv=90), glove="#f2f0ea")
+    up = h.P['upper']
+    box("zip", (0.014, 0.012, h.torso_h * 0.7), mat("#27314f", kind='soft'), up, loc=(0, -0.205 * h.W, h.torso_h * 0.5))
+    ellipsoid("patch", 0.04, mat("#ff7a59", kind='soft'), up, loc=(0.1 * h.W, -0.19 * h.W, h.torso_h * 0.72), scale=(1, 0.4, 1))
     h.head()
-    h.hair_cap("#1e1a1a", hairline=0.5, back_len=-0.6, sides=-0.3, fringe=(4, 0.2))
-    h.headscarf("#4ad6c8", color2="#f2f6fa", pat='vstripes', P=dict(nu=36, fv=30, thr=0.78), z_front=0.5)
+    h.headscarf("#b79ae0", color2="#8f6fd0", pat='vstripes', P=dict(nu=60, fv=30, thr=0.9), z_front=0.46, knot=False, scale=1.12)
+    open_helmet(h, "#ff6f61", "#fff4e6", z_front=0.62, peak=False)
+    helmet_goggles(h, z=0.72)
     h.flags = dict(kind='dress', stride=1.0)
-    h.portrait = dict(yaw=-24)
+    h.portrait = dict(yaw=-24, scale=1.12, dz=-0.1)
     return h
 
 
 def hero_boy():
-    sp = dict(skin=SKIN['b'], R=0.25, iris="#4a2e1e", brow_col="#1a1010", lip="#9a4a44", blush_amt=0.35,
-              head=dict(jaw=0.3, cheek=0.04, nose=0.09, chin=0.07), eye_h=0.14, lash_w=0.045, flick=0.3)
-    h = Human(sp)
-    h.legs("#2f3a5a", shoe="#2a2020", cuff="#2b2d36", pat='weave', P=dict(nu=24, fv=70), boots=True)
-    h.torso("#3f8fd2", pat='weave', P=dict(nu=40, fv=80), collar="#2b2d36", belt="#2b2d36", buttons=("#f6f4ee", 3))
-    racing_stripes(h)
-    h.arms("#3f8fd2", cuff="#2b2d36", P=dict(nu=18, fv=90), glove="#2b2d36")
-    h.head(ears=1.0)
-    h.hair_cap("#1e1414", hairline=0.56, back_len=-0.5, sides=-0.1, fringe=(7, 0.22), part=0.1)
-    h.flat_cap("#ffb020", color2="#2b2d36", tilt=-0.1, z=0.46, pat='weave')
+    """Rider look: lime open helmet with a peak and a number stripe, ginger fringe, teal and white jacket."""
+    sp = dict(skin=SKIN['a'], R=0.25, iris="#3a7a5a", brow_col="#a8521e", lip="#b0605a", blush_amt=0.5, freckles=True,
+              head=dict(jaw=0.26, cheek=0.02, nose=0.11, chin=0.09), eye_h=0.135, lash_w=0.04, flick=0.2)
+    h = Human(dict(sp, H=1.0))
+    h.legs("#30343f", shoe="#f2f0ea", cuff="#1fb5a8", pat='weave', P=dict(nu=24, fv=70), boots=True)
+    h.torso("#1fb5a8", pat='weave', P=dict(nu=40, fv=80), collar="#f2f0ea", belt="#30343f")
+    h.arms("#f2f0ea", cuff="#1fb5a8", P=dict(nu=18, fv=90), glove="#30343f")
+    up = h.P['upper']
+    ellipsoid("patch", 0.04, mat("#ffd166", kind='soft'), up, loc=(-0.1 * h.W, -0.19 * h.W, h.torso_h * 0.72), scale=(1, 0.4, 1))
+    h.head(ears=0.0)
+    h.hair_cap("#c8622a", hairline=0.5, back_len=-0.4, sides=-0.1, fringe=(6, 0.26), part=-0.15)
+    open_helmet(h, "#9ad83a", "#30343f", z_front=0.6, peak=True, number=7)
     h.flags = dict(kind='legs', stride=1.0)
-    h.portrait = dict(yaw=-24)
+    h.portrait = dict(yaw=-24, scale=1.12, dz=-0.1)
     return h
 
 

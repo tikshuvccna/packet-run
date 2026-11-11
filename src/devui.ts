@@ -19,7 +19,7 @@ export async function devRoute(ctx: Ctx, what: string): Promise<boolean> {
     case 'hub': await runLessonHub(ctx, `lesson${n}`); return true;
     case 'garage': ctx.save.data.coins = 500; await openGarage(ctx, (arg as 'cars') || 'cars'); return true;
     case 'hud': {
-      const hud = new Hud(ctx.bus, () => undefined, { autoGas: false });
+      const hud = new Hud(ctx.bus, () => undefined);
       hud.mount(document.getElementById('ui') as HTMLElement);
       hud.update({ speedKmh: 142, nitro: 1.8, nitroCap: 2.5, items: ['oil', 'mine'], coins: 120, race: { id: 'r1', he: 'מרוץ הרציפים', lap: 2, laps: 3, place: 2, total: 6, time: 74.3, checkpoint: 3, checkpoints: 8, gateQuestion: 'באיזו שכבה נמצאת כתובת IP?' }, heading: 0, x: 0, z: 0, nearPoi: null, wrongWay: false, drift: 0, combo: 3 });
       hud.setCoins(120);

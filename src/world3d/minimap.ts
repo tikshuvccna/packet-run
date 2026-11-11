@@ -11,7 +11,7 @@ export interface MinimapOpts {
   rivals?: { x: number; z: number }[];
 }
 
-const poiColor: Record<string, string> = { lesson: '#ffd23f', garage: '#ff7f6e', shop: '#4ad6c8', race: '#ffffff', fuel: '#7fd957', secret: '#b79ae0' };
+const poiColor: Record<string, string> = { lesson: '#ffd23f', garage: '#ff7f6e', shop: '#4ad6c8', race: '#ffffff', fuel: '#7fd957', secret: '#b79ae0', place: '#9ecbd9' };
 
 export function drawMinimap(g: CanvasRenderingContext2D, city: City, o: MinimapOpts): void {
   const W = g.canvas.width, H = g.canvas.height;
@@ -47,7 +47,13 @@ export function drawMinimap(g: CanvasRenderingContext2D, city: City, o: MinimapO
   const dot = (x: number, z: number, r: number, c: string): void => { g.fillStyle = c; g.beginPath(); g.arc(x, z, r / sc, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#1b1f2a'; g.lineWidth = 1.5 / sc; g.stroke(); };
   for (const p of o.pois ?? city.pois) dot(p.x, p.z, p.kind === 'race' ? 4 : 6, poiColor[p.kind] ?? '#fff');
   for (const r of o.rivals ?? []) dot(r.x, r.z, 4, '#e55a4e');
-  if (o.target) dot(o.target.x, o.target.z, 7, '#ffd23f');
+  if (o.target) {
+    // keep the objective on the map edge when it is far away
+    let tx = o.target.x, tz = o.target.z;
+    if (o.span !== 0) { const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz), lim = (Math.min(W, H) / 2 - 9) / sc; if (d > lim) { tx = o.x + (dx / d) * lim; tz = o.z + (dz / d) * lim; } }
+    dot(tx, tz, 8, '#ffd23f');
+    dot(tx, tz, 3.5, '#e5484d');
+  }
   // player arrow
   g.translate(o.x, o.z); g.rotate(o.heading); g.scale(1 / sc, 1 / sc);
   g.fillStyle = '#35d3b0'; g.strokeStyle = '#10141c'; g.lineWidth = 2;

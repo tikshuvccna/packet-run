@@ -17,6 +17,8 @@ export class Hud {
   private itemsEl: HTMLElement;
   private coinText: HTMLElement;
   private raceBox: HTMLElement;
+  private missionBox: HTMLElement;
+  private mission: { title: string; text: string; sec: number | null } | null = null;
   private banner: HTMLElement;
   private promptEl: HTMLElement;
   private toasts: HTMLElement;
@@ -28,17 +30,22 @@ export class Hud {
   private input: DriveInput = { ...NO_INPUT };
   private offs: (() => void)[] = [];
   private lastSend = 0;
-  private autoGas = true;
+  private touchMode = false;
+  private wheelEl!: HTMLElement;
+  private wheelAngle = 0;
+  private leverKnob!: HTMLElement;
+  private leverEl!: HTMLElement;
+  private lever = 0;
   private last: HudState | null = null;
   private actBtn!: HTMLButtonElement;
 
-  constructor(private bus: Bus, onPause: () => void, opts: { autoGas?: boolean } = {}) {
-    this.autoGas = opts.autoGas ?? true;
+  constructor(private bus: Bus, onPause: () => void) {
     const r = (this.root = h('div', 'hud'));
     const top = h('div', 'hud-top');
     const left = h('div', 'hud-left');
     this.raceBox = h('div', 'racebox hidden');
-    left.appendChild(this.raceBox);
+    this.missionBox = h('div', 'missionbox hidden');
+    left.append(this.raceBox, this.missionBox);
     const right = h('div', 'hud-right');
     const coin = h('div', 'coinpill');
     this.coinText = h('b', null, '0');
@@ -67,19 +74,18 @@ export class Hud {
     this.itemsEl = h('div', 'itemsrow');
     dash.append(nitro, this.itemsEl);
 
-    // touch controls: steering pad bottom-left, pedals bottom-right
+    // touch controls: a steering wheel you turn (bottom-left); a power lever like an airplane throttle (forward / N / R),
+    // a brake pedal and the action buttons (bottom-right)
     const steer = h('div', 'steerpad');
-    const sl = this.holdBtn('abtn arrow left', '', () => { this.input.steer = -1; }, () => { if (this.input.steer < 0) this.input.steer = 0; });
-    const sr = this.holdBtn('abtn arrow right', '', () => { this.input.steer = 1; }, () => { if (this.input.steer > 0) this.input.steer = 0; });
-    steer.append(sl, sr);
+    steer.appendChild(this.buildWheel());
     const pedals = h('div', 'pedals');
-    const gas = this.holdBtn('abtn gas', 'גז', () => { this.input.throttle = 1; }, () => { this.input.throttle = this.autoGas ? 1 : 0; });
-    const brake = this.holdBtn('abtn brake', 'בלם', () => { this.input.brake = 1; this.input.throttle = 0; }, () => { this.input.brake = 0; this.input.throttle = this.autoGas ? 1 : 0; });
+    const brake = this.holdBtn('abtn brake', 'בלם', () => { this.input.brake = 1; }, () => { this.input.brake = 0; });
     const nit = this.holdBtn('abtn nitro', 'נייטרוס', () => { this.input.nitro = true; }, () => { this.input.nitro = false; });
     const item = this.holdBtn('abtn throwit', 'זריקה', () => { this.input.useItem = true; }, () => { this.input.useItem = false; });
     const drift = this.holdBtn('abtn drift', 'דריפט', () => { this.input.handbrake = true; }, () => { this.input.handbrake = false; });
-    pedals.append(nit, item, drift, brake, gas);
-    if (this.autoGas) this.input.throttle = 1;
+    this.touchMode = matchMedia('(pointer: coarse), (hover: none)').matches;
+    if (this.touchMode) this.input.reverse = 0;
+    pedals.append(drift, nit, item, brake, this.buildLever());
     this.actBtn = this.holdBtn('abtn act hidden', 'כניסה', () => { this.input.action = true; }, () => { this.input.action = false; });
     const back = this.holdBtn('abtn resetbtn', 'חזרה לכביש', () => { this.input.reset = true; }, () => { this.input.reset = false; });
     const look = this.holdBtn('abtn lookbtn', 'מאחור', () => { this.input.look = true; }, () => { this.input.look = false; });
@@ -90,6 +96,7 @@ export class Hud {
       bus.on('drive:hud', (s) => this.update(s)),
       bus.on('drive:prompt', (p) => { this.promptEl.textContent = p?.text ?? ''; this.promptEl.classList.toggle('hidden', !p); }),
       bus.on('drive:toast', (t) => this.toast(t.text, t.kind)),
+      bus.on('ui:pause', (p) => { if (p.paused) this.setLever(0); }),
       bus.on('ui:clock', (c) => { this.fuelFill.style.width = `${Math.max(0, Math.min(1, c.fuel)) * 100}%`; this.fuelFill.classList.toggle('low', c.fuel < 0.25); }),
     );
     this.send(true);
@@ -98,11 +105,20 @@ export class Hud {
   mount(parent: HTMLElement): void { parent.appendChild(this.root); }
   destroy(): void { this.offs.forEach((o) => o()); this.root.remove(); this.bus.emit('ui:input', { ...NO_INPUT }); }
   setMiniMap(p: MiniMapProvider | null): void { this.mapProvider = p; this.map.classList.toggle('hidden', !p); }
+  /** Current mission step (null hides the box). sec = seconds left of a time limit. */
+  setMission(m: { title: string; text: string; sec: number | null } | null): void {
+    this.mission = m;
+    this.missionBox.textContent = '';
+    this.missionBox.classList.toggle('hidden', !m || !!this.last?.race);
+    if (!m) return;
+    this.missionBox.append(h('b', null, m.title), h('span', null, m.text));
+    if (m.sec !== null) { const t = h('span', 'mtimer', fmtTime(Math.max(0, m.sec)).replace(/\.\d$/, '')); if (m.sec <= 15) t.classList.add('low'); this.missionBox.appendChild(t); }
+  }
   setCoins(n: number): void { this.coinText.textContent = String(Math.round(n)); }
-  setAutoGas(on: boolean): void { this.autoGas = on; this.input.throttle = on ? 1 : 0; this.send(true); }
 
   update(s: HudState): void {
     this.last = s;
+    this.send();   // keep the touch input fresh (the engine drops it after 400 ms of silence)
     this.speedEl.textContent = String(Math.round(s.speedKmh));
     this.nitroFill.style.width = `${Math.max(0, Math.min(1, s.nitro / Math.max(0.01, s.nitroCap))) * 100}%`;
     this.itemsEl.textContent = '';
@@ -111,13 +127,14 @@ export class Hud {
       i.style.borderColor = ITEM_COLOR[it];
       this.itemsEl.appendChild(i);
     }
-    this.actBtn.classList.toggle('hidden', !s.nearPoi || !!s.race);
+    this.actBtn.classList.toggle('hidden', !s.nearPoi || s.nearPoi.kind === 'place' || !!s.race);
     this.wrongWay.classList.toggle('hidden', !s.wrongWay);
     this.comboEl.textContent = s.combo > 1 ? `קומבו ${s.combo}` : '';
     this.comboEl.classList.toggle('hidden', s.combo <= 1);
     if (s.race) {
       const rc = s.race;
       this.raceBox.classList.remove('hidden');
+      this.missionBox.classList.add('hidden');
       this.raceBox.textContent = '';
       this.raceBox.append(
         h('b', null, rc.he),
@@ -128,6 +145,7 @@ export class Hud {
       if (rc.gateQuestion) { this.banner.textContent = rc.gateQuestion; this.banner.classList.remove('hidden'); } else this.banner.classList.add('hidden');
     } else {
       this.raceBox.classList.add('hidden');
+      this.missionBox.classList.toggle('hidden', !this.mission);
       this.banner.classList.add('hidden');
     }
     if (this.mapProvider) {
@@ -150,6 +168,75 @@ export class Hud {
     if (!force && now - this.lastSend < 33) return;
     this.lastSend = now;
     this.bus.emit('ui:input', { ...this.input });
+  }
+
+  /** Steering wheel: drag around its centre to turn it (up to 110 degrees each way); it springs back when released. */
+  private buildWheel(): HTMLElement {
+    const MAX = 110;
+    const w = (this.wheelEl = h('div', 'wheel'));
+    w.append(h('span', 'wheel-spoke s1'), h('span', 'wheel-spoke s2'), h('span', 'wheel-spoke s3'), h('span', 'wheel-hub'), h('span', 'wheel-mark'));
+    let id = -1, prev = 0, raf = 0;
+    const angleOf = (e: PointerEvent): number => { const r = w.getBoundingClientRect(); return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI; };
+    const apply = (): void => {
+      w.style.transform = `rotate(${this.wheelAngle}deg)`;
+      const k = this.wheelAngle / MAX;
+      this.input.steer = Math.sign(k) * Math.pow(Math.abs(k), 0.8);
+      this.send(true);
+    };
+    const spring = (): void => {
+      if (id >= 0) return;
+      this.wheelAngle *= 0.72;
+      if (Math.abs(this.wheelAngle) < 1) this.wheelAngle = 0;
+      apply();
+      if (this.wheelAngle !== 0) raf = requestAnimationFrame(spring);
+    };
+    w.addEventListener('pointerdown', (e) => { e.preventDefault(); cancelAnimationFrame(raf); id = e.pointerId; prev = angleOf(e); try { w.setPointerCapture(id); } catch { /* old browsers */ } });
+    w.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== id) return;
+      const a = angleOf(e);
+      let d = a - prev; prev = a;
+      if (d > 180) d -= 360; else if (d < -180) d += 360;
+      this.wheelAngle = Math.max(-MAX, Math.min(MAX, this.wheelAngle + d));
+      apply();
+    });
+    const up = (e: PointerEvent): void => { if (e.pointerId !== id) return; id = -1; raf = requestAnimationFrame(spring); };
+    w.addEventListener('pointerup', up);
+    w.addEventListener('pointercancel', up);
+    return w;
+  }
+
+  /** Power lever (like an airplane throttle): push up for forward power (it stays where you leave it), middle = N, bottom = R. */
+  private buildLever(): HTMLElement {
+    const box = (this.leverEl = h('div', 'gearbox'));
+    const track = h('div', 'gear-track');
+    this.leverKnob = h('div', 'gear-knob');
+    track.append(h('span', 'gear-lab d', 'D'), h('span', 'gear-lab n', 'N'), h('span', 'gear-lab r', 'R'), this.leverKnob);
+    box.appendChild(track);
+    let id = -1;
+    const read = (e: PointerEvent): number => { const r = track.getBoundingClientRect(); return Math.max(-1, Math.min(1, 1 - ((e.clientY - r.top) / r.height) * 2)); };
+    box.addEventListener('pointerdown', (e) => { e.preventDefault(); id = e.pointerId; try { box.setPointerCapture(id); } catch { /* old browsers */ } this.setLever(read(e), false); });
+    box.addEventListener('pointermove', (e) => { if (e.pointerId === id) this.setLever(read(e), false); });
+    const up = (e: PointerEvent): void => { if (e.pointerId !== id) return; id = -1; this.setLever(this.lever, true); };
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
+    this.setLever(0);
+    return box;
+  }
+
+  /** v: -1 (R) .. 0 (N) .. 1 (full power). snap = settle into the nearest notch. */
+  private setLever(v: number, snap = true): void {
+    if (!this.leverKnob) return;
+    if (snap) v = v < -0.4 ? -1 : v < 0.2 ? 0 : v > 0.88 ? 1 : v;
+    this.lever = v;
+    const gear = v < -0.4 ? 'r' : v < 0.2 ? 'n' : 'd';
+    this.leverKnob.style.top = `${(1 - v) * 50}%`;
+    this.leverEl.dataset['gear'] = gear;
+    this.leverKnob.textContent = gear === 'd' ? `${Math.round(((v - 0.2) / 0.8) * 100)}%` : gear.toUpperCase();
+    if (this.touchMode) {
+      this.input.throttle = gear === 'd' ? Math.max(0.05, (v - 0.2) / 0.8) : 0;
+      this.input.reverse = gear === 'r' ? 1 : 0;
+    }
+    this.send(true);
   }
 
   private holdBtn(cls: string, label: string, down: () => void, up: () => void): HTMLButtonElement {

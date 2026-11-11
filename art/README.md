@@ -61,6 +61,11 @@ Specials: `bld_garage_main` (Dina, wrench sign), `bld_garage_lesson06` (rule bad
 (45 m, seven glowing floors, beacon). Building materials: `Wall`, `Wall2`, `Roof`, `Accent`, `Trim`, `Frame`, `Glass`, `Door`,
 `Metal`, `Stone`, `Wood`, `Leaf`, `Emissive`, `Light_tail`, plus a few named colours (Icon0-5, P0-4, F0-3, Box0-5, ...).
 
+Landmarks (`blender/bld_special.py`, POI kind `place`): `bld_cityhall` (columns, clock tower), `bld_stadium` (oval bowl, floodlights),
+`bld_police`, `bld_taxi` (canopy station), `bld_bakery`, `bld_bookshop`, `bld_pizza`, `bld_tires`. Traffic extras: `moto` (motorcycle
+with rider, `Paint` = tank and helmet), `taxi_sign`, `police_bar` (roof pieces, origin = bottom centre). City hall, police and moto are
+over the usual triangle limits on purpose (one-off landmarks).
+
 Props: `tree_a` round, `tree_b` pine, `tree_c` palm, `tree_d` autumn, `tree_e` cypress, `tree_f` blossom, `bush`, `plant_flowers`,
 `rock_a|b`, `lamp_post` (arm toward -Z), `traffic_light` (lamps `Light_red|Light_yellow|Light_green`), `fence` (4 m along X),
 `sign_arrow`, `bench`, `crate`, `barrel`, `statue_small`.
@@ -81,8 +86,8 @@ seamless; road_lines: u across the road, v along, one tile = 8 m), `ground_grass
 ## Portraits `public/assets/portraits/<who>_<mood>.png` (512, moods neutral/happy/worried/surprised, + index.json)
 New: `dina` (elderly mechanic: red flowered headscarf with goggles, plaid shirt, denim overalls, grease smudge, wrench in pocket),
 `gee` (GPS buddy, face on the screen, antenna, suction mount), `noise` (helmet with a dark visor, face hidden, glowing slit eyes,
-violet glitch stripes, RGB-split + flaking letters pass). `hero_girl` / `hero_boy` re-rendered as couriers (racing jackets, headscarf /
-cap). Kept from the ship: `uri`, `talia`, `barak`, `naama`, `bit` (sailor/keeper clothes).
+violet glitch stripes, RGB-split + flaking letters pass). `hero_girl` / `hero_boy` are riders (2026-11-10, redone so they do not repeat the heroes of the earlier games): girl = coral open
+helmet with goggles over a lilac headscarf, yellow jacket; boy = lime helmet with a peak, ginger fringe, teal jacket. Kept from the ship: `uri`, `talia`, `barak`, `naama`, `bit` (sailor/keeper clothes).
 
 ## Previews (looked at)
 `art/preview_cars.png`, `art/preview_cars_rear.png` (five cars with vinyls + spoilers), `art/preview_street.png` (chase cam at racing

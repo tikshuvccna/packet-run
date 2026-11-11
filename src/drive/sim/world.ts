@@ -123,13 +123,19 @@ export class DriveSim {
       const lane = e.avenue ? 4.4 : 2.5;
       const x = mx - uz * lane, z = mz + ux * lane;
       if (this.drivers.some((o) => Math.hypot(o.car.x - x, o.car.z - z) < 12)) continue;
-      const carId = this.rng.pick(['van', 'hatch', 'hatch', 'jeep', 'van'] as const);
+      // one in four is a taxi, a patrol car or a motorcycle
+      const roll = this.rand();
+      const extra: CarLook['extra'] = roll < 0.11 ? 'taxi' : roll < 0.16 ? 'police' : roll < 0.28 ? 'moto' : undefined;
+      const carId = extra ? 'hatch' : this.rng.pick(['van', 'hatch', 'hatch', 'jeep', 'van'] as const);
       const st = baseStats(carId);
       st.topSpeed *= 0.6;
+      if (extra === 'moto') st.mass = 320;
       const c = createCar(this.nextId++, carId, st, x, z, headingOf(ux, uz), city);
+      if (extra === 'moto') c.dims = { ...c.dims, length: 2.1, width: 0.9, height: 1.8, a: 0.72, b: 0.68, track: 0.5 };
       const v = (e.avenue ? 14 : 10.5) * (0.9 + this.rand() * 0.2);
       c.vx = ux * v * 0.8; c.vz = uz * v * 0.8;
-      const look: CarLook = { car: carId, paint: this.rng.pick(TRAFFIC_PAINTS), vinyl: null, vinylColor: '#fff', wheels: 'std', rim: '#d8dde3', spoiler: false };
+      const paint = extra === 'taxi' ? '#ffc61a' : extra === 'police' ? '#f3f6fa' : this.rng.pick(TRAFFIC_PAINTS);
+      const look: CarLook = { car: carId, paint, vinyl: extra === 'taxi' ? 'checker' : extra === 'police' ? 'stripes' : null, vinylColor: extra === 'police' ? '#2f5fa8' : '#22262e', wheels: 'std', rim: '#d8dde3', spoiler: false, extra };
       const tr: TrafficAI = { pts: [], cur: 0, edge: eid, to: T.id, vBase: v, waitT: 0 };
       extendTraffic(tr, city, this.rand);
       this.drivers.push({ car: c, kind: 'traffic', name: 'traffic', look, items: [], racer: null, traffic: tr, prevUse: false, near: false, nearT: 0 });

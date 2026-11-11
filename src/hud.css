@@ -9,6 +9,10 @@ body.modal .hud { visibility: hidden; }
 .hud-right .btn { pointer-events: auto; }
 .racebox { display: flex; flex-direction: column; gap: 2px; background: rgba(8, 26, 45, .78); border: 2px solid var(--brass); border-radius: 12px; padding: 6px 12px; font-weight: 800; direction: rtl; text-align: right; min-width: 130px; }
 .racebox b { color: #ffe39a; }
+.missionbox { display: flex; flex-direction: column; gap: 1px; background: rgba(8, 26, 45, .8); border: 2px solid #ffd23f; border-radius: 12px; padding: 5px 11px; font-weight: 700; direction: rtl; text-align: right; max-width: min(250px, 50vw); font-size: .86rem; line-height: 1.25; }
+.missionbox b { color: #ffd23f; font-size: .76rem; }
+.missionbox .mtimer { color: #9bf3ff; font-weight: 900; font-variant-numeric: tabular-nums; direction: ltr; text-align: right; }
+.missionbox .mtimer.low { color: #ff8a80; animation: pulse 1s infinite; }
 .minimap { width: min(140px, 26vw); height: min(140px, 26vw); border-radius: 50%; background: rgba(8, 26, 45, .6); border: 3px solid var(--brass); }
 .fuelgauge { display: flex; align-items: center; gap: 6px; direction: rtl; width: min(160px, 34vw); }
 .fuel-label { font-size: .75rem; font-weight: 800; text-shadow: 0 1px 2px #000; }
@@ -33,54 +37,60 @@ body.modal .hud { visibility: hidden; }
 .toast.good { border-color: var(--ok); }
 .toast.bad { border-color: var(--bad); }
 @keyframes pop { from { transform: scale(.8); opacity: 0; } }
-.steerpad { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); display: none; gap: 10px; }
-.pedals { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); display: none; grid-template-columns: repeat(3, auto); grid-template-rows: auto auto; gap: 8px; align-items: end; justify-items: end; }
+.steerpad { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: max(12px, env(safe-area-inset-bottom)); display: none; }
+.wheel { pointer-events: auto; touch-action: none; position: relative; width: 132px; height: 132px; border-radius: 50%; border: 14px solid #2b2f3a; box-shadow: 0 0 0 3px rgba(255,255,255,.55), inset 0 0 0 3px rgba(255,255,255,.25); background: rgba(8, 26, 45, .35); box-sizing: border-box; }
+.wheel-spoke { position: absolute; left: 50%; top: 50%; width: 50%; height: 12px; margin-top: -6px; background: #2b2f3a; transform-origin: 0 50%; border-radius: 6px; }
+.wheel-spoke.s1 { transform: rotate(0deg); } .wheel-spoke.s2 { transform: rotate(180deg); } .wheel-spoke.s3 { transform: rotate(90deg); }
+.wheel-hub { position: absolute; left: 50%; top: 50%; width: 38%; height: 38%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--brass, #e0a940); border: 3px solid #2b2f3a; }
+.wheel-mark { position: absolute; left: 50%; top: -13px; width: 10px; height: 12px; margin-left: -5px; background: #ff5a4e; border-radius: 3px; }
+.pedals { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); display: none; grid-template-columns: auto auto auto; grid-template-rows: auto auto; gap: 8px; align-items: end; justify-items: center; }
 .abtn { pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid rgba(255,255,255,.55); background: rgba(224, 169, 64, .82); color: #1d2a3a; font: inherit; font-weight: 900; width: 58px; height: 58px; font-size: .75rem; padding: 0; }
-.abtn.gas { grid-column: 3; grid-row: 1 / span 2; width: 92px; height: 92px; font-size: 1.1rem; background: rgba(79, 191, 122, .85); }
-.abtn.brake { grid-column: 2; grid-row: 2; background: rgba(229, 90, 78, .85); }
-.abtn.nitro { grid-column: 3; grid-row: 1; display: none; }
-.abtn.throwit { grid-column: 1; grid-row: 2; background: rgba(155, 89, 208, .85); color: #fff; }
 .abtn.drift { grid-column: 1; grid-row: 1; background: rgba(53, 211, 176, .85); }
-.abtn.nitro { display: block; grid-column: 2; grid-row: 1; background: rgba(74, 144, 226, .9); color: #fff; }
-.abtn.arrow { width: 84px; height: 84px; position: relative; background: rgba(255,255,255,.22); }
-.abtn.arrow::after { content: ''; position: absolute; left: 50%; top: 50%; border: solid transparent; border-width: 16px 24px 16px 0; border-right-color: #fff; transform: translate(-50%, -50%); }
-.abtn.arrow.right::after { border-width: 16px 0 16px 24px; border-left-color: #fff; border-right-color: transparent; }
+.abtn.nitro { grid-column: 2; grid-row: 1; background: rgba(74, 144, 226, .9); color: #fff; }
+.abtn.throwit { grid-column: 1; grid-row: 2; background: rgba(155, 89, 208, .85); color: #fff; }
+.abtn.brake { grid-column: 2; grid-row: 2; background: rgba(229, 90, 78, .9); color: #fff; width: 70px; height: 70px; font-size: .95rem; }
+.gearbox { grid-column: 3; grid-row: 1 / span 2; pointer-events: auto; touch-action: none; width: 62px; height: 168px; padding: 18px 0; box-sizing: border-box; border-radius: 16px; background: rgba(8, 26, 45, .8); border: 3px solid rgba(255,255,255,.55); }
+.gear-track { position: relative; width: 10px; height: 100%; margin: 0 auto; border-radius: 6px; background: linear-gradient(180deg, #4fbf7a 0 40%, #8a93a0 40% 70%, #e55a4e 70% 100%); }
+.gear-lab { position: absolute; left: -20px; font-size: .7rem; font-weight: 900; color: rgba(255,255,255,.55); transform: translateY(-50%); }
+.gear-lab.d { top: 0; } .gear-lab.n { top: 50%; } .gear-lab.r { top: 100%; }
+.gearbox[data-gear="d"] .gear-lab.d, .gearbox[data-gear="n"] .gear-lab.n, .gearbox[data-gear="r"] .gear-lab.r { color: #ffe39a; }
+.gear-knob { position: absolute; left: 50%; width: 44px; height: 30px; margin: -15px 0 0 -14px; border-radius: 9px; background: linear-gradient(180deg, #ffe39a, #e0a940); border: 3px solid #2b2f3a; box-sizing: border-box; color: #1d2a3a; font-weight: 900; font-size: .68rem; display: flex; align-items: center; justify-content: center; }
+.gearbox[data-gear="r"] .gear-knob { background: linear-gradient(180deg, #ff9a8f, #e55a4e); color: #fff; }
+.gearbox[data-gear="n"] .gear-knob { background: linear-gradient(180deg, #e3e7ec, #a9b2bd); }
 .abtn.down { filter: brightness(1.3); transform: scale(.95); }
 @media (pointer: coarse), (hover: none) { .steerpad, .pedals { display: flex; } .pedals { display: grid; } }
 @media (max-height: 460px) {
-  .abtn { width: 48px; height: 48px; } .abtn.gas { width: 74px; height: 74px; } .abtn.arrow { width: 68px; height: 68px; }
+  .abtn { width: 48px; height: 48px; } .abtn.brake { width: 58px; height: 58px; } .wheel { width: 112px; height: 112px; border-width: 12px; } .gearbox { height: 132px; width: 56px; padding: 16px 0; }
   .minimap { width: 90px; height: 90px; } .dash { bottom: 6px; } .speed { font-size: 1.6rem; } .nitrobar { display: none; }
   .prompt { bottom: 70px; } .lcard { padding: 10px; } .logo h1 { font-size: 2rem; }
   .screen.title-screen { gap: 8px; } .menu { gap: 6px; } .lh-top .portrait.big { width: 64px; height: 64px; }
 }
-@media (max-width: 480px) { .match { grid-template-columns: 1fr; } .lh-games { grid-template-columns: 1fr; } .hrow { grid-template-columns: 1fr; } .abtn.arrow { width: 70px; height: 70px; } }
+@media (max-width: 480px) { .match { grid-template-columns: 1fr; } .lh-games { grid-template-columns: 1fr; } .hrow { grid-template-columns: 1fr; } }
 
 /* touch: enter button near a POI, back-to-road and look-back */
-.abtn.act { position: absolute; right: max(120px, calc(env(safe-area-inset-right) + 120px)); bottom: 170px; width: 84px; height: 84px; background: rgba(255, 216, 119, .95); font-size: 1rem; display: none; }
+.abtn.act { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 216px); bottom: 14px; width: 84px; height: 84px; background: rgba(255, 216, 119, .95); font-size: 1rem; display: none; }
 .abtn.act:not(.hidden) { display: none; }
 .abtn.resetbtn, .abtn.lookbtn { position: absolute; left: max(12px, env(safe-area-inset-left)); width: 64px; height: 40px; border-radius: 12px; font-size: .7rem; background: rgba(255,255,255,.2); display: none; }
-.abtn.resetbtn { bottom: 108px; }
-.abtn.lookbtn { bottom: 156px; }
+.abtn.resetbtn { bottom: 158px; }
+.abtn.lookbtn { bottom: 158px; left: calc(max(12px, env(safe-area-inset-left)) + 72px); }
 @media (pointer: coarse), (hover: none) { .abtn.act:not(.hidden) { display: block; } .abtn.resetbtn, .abtn.lookbtn { display: block; } }
-@media (max-height: 460px) { .abtn.act { bottom: 100px; right: 112px; width: 64px; height: 64px; } .abtn.resetbtn { bottom: 84px; } .abtn.lookbtn { bottom: 130px; } }
+@media (max-height: 460px) { .abtn.act { bottom: 10px; right: calc(max(12px, env(safe-area-inset-right)) + 190px); width: 64px; height: 64px; } .abtn.resetbtn { bottom: 134px; } .abtn.lookbtn { bottom: 134px; } }
 
 /* portrait phones: lift the speedometer and prompt above the touch controls */
 @media (orientation: portrait) and (max-width: 700px) {
-  .dash { bottom: 124px; }
-  .prompt { bottom: 250px; }
-  .abtn.act { bottom: 240px; right: 14px; }
-  .abtn.resetbtn { bottom: 130px; } .abtn.lookbtn { bottom: 178px; }
+  .dash { bottom: 204px; }
+  .prompt { bottom: 330px; }
+  .abtn.act { bottom: 250px; right: 14px; }
+  .abtn.resetbtn, .abtn.lookbtn { bottom: 150px; }
 }
 
 /* narrow phones: smaller pads so steering and pedals never overlap (checked at 320 and 360 wide) */
 @media (max-width: 420px) {
-  .steerpad { gap: 6px; }
-  .abtn.arrow { width: 56px; height: 56px; }
-  .abtn.arrow::after { border-width: 12px 18px 12px 0; }
-  .abtn.arrow.right::after { border-width: 12px 0 12px 18px; }
+  .wheel { width: 108px; height: 108px; border-width: 12px; }
   .pedals { gap: 6px; }
   .abtn { width: 46px; height: 46px; font-size: .62rem; }
-  .abtn.gas { width: 68px; height: 68px; font-size: .95rem; }
-  .abtn.act { right: 12px; bottom: 236px; width: 64px; height: 64px; }
+  .abtn.brake { width: 56px; height: 56px; font-size: .8rem; }
+  .gearbox { width: 54px; height: 150px; }
+  .abtn.act { right: 12px; bottom: 250px; width: 64px; height: 64px; }
   .abtn.resetbtn, .abtn.lookbtn { width: 56px; height: 34px; font-size: .6rem; }
 }

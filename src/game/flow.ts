@@ -8,6 +8,7 @@ import { btn, h, overlay, ui } from '../ui/dom';
 import { LESSON_GARAGE, LESSON_IDS, gatesFor } from '../content';
 import type { DriveConfig, RaceDef, RaceResult } from '../drive/contract';
 import { cleanedDistricts, nextLesson, statsFor } from './progress';
+import { advance, currentMission, currentStep, failStep, stepPoi, stepSatisfied } from './missions';
 
 /** The 10 minute rule: fuel runs out after CAP seconds of driving without finishing a lesson. */
 export const FUEL_CAP_SEC = 10 * 60;
@@ -17,6 +18,8 @@ const TOW_AFTER = 1.2;        // 12 minutes: the tow truck takes the player to t
 /** Where things are in the city (provided by the engine's city generator). */
 export interface CityInfo {
   poiPos(id: string): { x: number; z: number; heading: number } | null;
+  /** the POI ring itself (mission beams) */
+  poiRaw(id: string): { x: number; z: number; label: string } | null;
   minimap?: MiniMapProvider;
   /** POI id of the garage of a lesson, of the main garage, of the shop. */
   lessonPoi(lessonId: string): string;
@@ -34,6 +37,8 @@ export class Flow {
   private inRace = false;
   private raceCoins = 0;
   private lastResult = '';
+  private deadline: number | null = null;   // seconds left of a timed mission step
+  private missionBusy = false;
 
   constructor(private ctx: Ctx) {}
 
@@ -41,6 +46,9 @@ export class Flow {
   setCity(c: CityInfo): void { this.city = c; }
   /** Where the minimap arrow points: the garage of the next lesson, or the grand prix when all lessons are done. */
   objective(): { x: number; z: number } | null {
+    const mp = stepPoi(currentStep(this.s));
+    const mq = mp ? this.city?.poiRaw(mp) : null;
+    if (mq) return { x: mq.x, z: mq.z };
     const lesson = nextLesson(this.s);
     const id = lesson ? this.city?.lessonPoi(lesson) : 'race_grandprix';
     const p = id ? this.city?.poiPos(id) : null;
@@ -82,7 +90,7 @@ export class Flow {
   private drive(): Promise<void> {
     const bus = this.ctx.bus;
     let finish: () => void = () => undefined;
-    const hud = new Hud(bus, () => { void this.pauseMenu().then((leave) => { if (leave) finish(); }); }, { autoGas: matchMedia('(pointer: coarse)').matches });
+    const hud = new Hud(bus, () => { void this.pauseMenu().then((leave) => { if (leave) finish(); }); });
     this.hud = hud;
     hud.mount(ui());
     hud.setCoins(this.s.coins);
@@ -98,6 +106,7 @@ export class Flow {
         hud.destroy();
         this.hud = null;
         this.ctx.audio.engineOff();
+        bus.emit('drive:marker', null);
         bus.emit('drive:quit', undefined);
         resolve();
       };
@@ -107,15 +116,79 @@ export class Flow {
         bus.on('drive:pickup', (p) => { if (p.kind === 'coin') { this.earn(p.amount); if (this.inRace) this.raceCoins += p.amount; } else if (p.kind === 'parcel' && p.id && !this.s.parcels[p.id]) { this.s.parcels[p.id] = true; this.earn(20); } }),
         bus.on('drive:position', (p) => { if (performance.now() - this.lastPosSave > 4000) { this.lastPosSave = performance.now(); this.s.pos = { ...p }; this.ctx.save.save(); } }),
         bus.on('drive:poi', (e) => { void this.onPoi(e); }),
+        bus.on('drive:hud', (s) => this.onHud(s.x, s.z)),
         bus.on('drive:race-end', (r) => { void this.onRaceEnd(r); }),
       );
       bus.emit('drive:start', this.config(this.s.pos));
-      const next = nextLesson(this.s);
-      if (!this.s.flags['tip.drive']) {
-        this.s.flags['tip.drive'] = true; this.ctx.save.save();
-        hud.toast(next ? 'נסעו אל מוסך החוקים: עיגול כניסה, ואז E' : 'גרנד פרי הרשת מחכה', 'info', 4500);
-      }
+      this.deadline = null;
+      void this.enterStep();
     });
+  }
+
+  /* ------------------------------------------------------------ main missions */
+  private showMission(): void {
+    const m = currentMission(this.s), st = currentStep(this.s);
+    if (!m || !st || st.t === 'say') { this.hud?.setMission(null); this.ctx.bus.emit('drive:marker', null); return; }
+    this.hud?.setMission({ title: `משימה: ${m.title}`, text: st.text, sec: this.deadline });
+    const id = stepPoi(st);
+    const p = id ? this.city?.poiRaw(id) : null;
+    this.ctx.bus.emit('drive:marker', p ? { x: p.x, z: p.z, label: p.label } : null);
+  }
+
+  /** Enter the current step: play its talk, skip what is already done, start its clock, show it. */
+  private async enterStep(): Promise<void> {
+    if (this.missionBusy) return;
+    this.missionBusy = true;
+    try {
+      for (;;) {
+        const st = currentStep(this.s);
+        if (!st) break;
+        if (st.t === 'say') { this.hud?.setMission(null); await this.modal(() => say(this.ctx, st.lines)); this.stepDone(); continue; }
+        if (stepSatisfied(this.s, st)) { this.stepDone(); continue; }
+        if (st.t === 'goto') { if (st.sec !== undefined) this.deadline = st.sec; else if (!st.keep) this.deadline = null; } else this.deadline = null;
+        break;
+      }
+    } finally { this.missionBusy = false; }
+    this.ctx.save.save();
+    this.showMission();
+  }
+
+  private stepDone(): void {
+    const st = currentStep(this.s);
+    const fin = advance(this.s);
+    if (fin) {
+      this.deadline = null;
+      this.earn(fin.reward);
+      this.hud?.toast(`משימה הושלמה: ${fin.title} · +${fin.reward} מטבעות`, 'good', 4200);
+      this.ctx.audio.sfx('win');
+    } else if (st && st.t === 'goto') {
+      if (st.done) this.hud?.toast(st.done, 'good');
+      this.ctx.audio.sfx('good');
+    }
+  }
+
+  /** 10 times a second while driving: did the car reach the mission ring? */
+  private onHud(x: number, z: number): void {
+    if (this.inModal || this.inRace || this.missionBusy || this.paused) return;
+    const st = currentStep(this.s);
+    if (!st || st.t !== 'goto') return;
+    const p = this.city?.poiRaw(st.poi);
+    if (!p || Math.hypot(p.x - x, p.z - z) > 16) return;
+    this.stepDone();
+    void this.enterStep();
+  }
+
+  private missionClock(): void {
+    if (this.deadline === null || this.inRace || this.missionBusy) return;
+    const st = currentStep(this.s);
+    if (!st || st.t !== 'goto') { this.deadline = null; return; }
+    this.deadline--;
+    if (this.deadline > 0) { this.showMission(); return; }
+    this.deadline = null;
+    failStep(this.s);
+    this.hud?.toast('נגמר הזמן. מנסים שוב', 'bad', 3500);
+    this.ctx.audio.sfx('bad');
+    void this.enterStep();
   }
 
   private earn(n: number): void {
@@ -126,6 +199,7 @@ export class Flow {
 
   /** One second of driving: advances the fuel clock and its story beats. */
   private tick(): void {
+    this.missionClock();
     if (nextLesson(this.s) === null) { this.ctx.bus.emit('ui:clock', { fuel: 1 }); return; }
     this.driveSec++;
     const f = this.driveSec / FUEL_CAP_SEC;
@@ -178,6 +252,7 @@ export class Flow {
     this.ctx.bus.emit('drive:set-look', { ...this.s.look });
     this.hud?.setCoins(this.s.coins);
     this.ctx.audio.mood('city');
+    void this.enterStep();
   }
 
   private async modal(fn: () => Promise<void>): Promise<void> {
@@ -210,6 +285,9 @@ export class Flow {
       await openCredits(this.ctx);
       this.inModal = false;
     }
+    const st = currentStep(this.s);
+    if (st && st.t === 'race' && st.race === r.raceId && (!st.win || r.place === 1)) { this.stepDone(); void this.enterStep(); }
+    else if (st && st.t === 'race' && st.race === r.raceId) this.hud?.toast('צריך מקום ראשון. נסו שוב', 'info', 3500);
   }
 
   /** Pause overlay. Resolves true when the player asked to leave to the title. */

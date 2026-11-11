@@ -4,6 +4,7 @@ import type { CarLook, DriveConfig, DriveInput, HudState, ItemId, RaceDef, RaceR
 export interface GameEvents {
   /** Drive -> UI */
   'drive:hud': HudState;
+  'drive:marker': { x: number; z: number; label: string } | null;
   'drive:prompt': { text: string; id: string } | null;
   'drive:toast': { text: string; kind?: 'info' | 'good' | 'bad' };
   'drive:poi': { id: string; kind: string; lesson?: string; race?: RaceDef };   // the player pressed enter inside a POI circle

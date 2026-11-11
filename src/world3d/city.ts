@@ -512,6 +512,16 @@ export function generateCity(seed: number): City {
   addSite('shop_main', 'shop', 'חנות החלקים', c4[0] - 180, c4[1] + 200, 'bld_shop', 22, 16, 8);
   addSite('fuel1', 'fuel', 'תחנת דלק', c1[0] - 420, c1[1] - 60, 'bld_fuel', 22, 14, 6);
   addSite('fuel2', 'fuel', 'תחנת דלק', c2[0] + 200, c2[1] - 250, 'bld_fuel', 22, 14, 6);
+  // landmarks (mission stops)
+  const c3s = centers[2] as [number, number], c5s = centers[4] as [number, number], c6s = centers[5] as [number, number];
+  addSite('place_cityhall', 'place', 'העירייה', c5s[0] + 40, c5s[1] - 60, 'bld_cityhall', 0, 0, 0);
+  addSite('place_stadium', 'place', 'האיצטדיון', c2[0] - 220, c2[1] + 170, 'bld_stadium', 0, 0, 0);
+  addSite('place_police', 'place', 'תחנת המשטרה', c4[0] + 220, c4[1] - 160, 'bld_police', 0, 0, 0);
+  addSite('place_taxi', 'place', 'תחנת המוניות', c5s[0] - 230, c5s[1] + 190, 'bld_taxi', 0, 0, 0);
+  addSite('place_bakery', 'place', 'המאפייה', c1[0] + 60, c1[1] + 200, 'bld_bakery', 0, 0, 0);
+  addSite('place_bookshop', 'place', 'חנות הספרים', c6s[0] + 100, c6s[1] + 100, 'bld_bookshop', 0, 0, 0);
+  addSite('place_pizza', 'place', 'הפיצרייה', c7[0] + 160, c7[1] - 160, 'bld_pizza', 0, 0, 0);
+  addSite('place_tires', 'place', 'מוסך הצמיגים', c3s[0] - 120, c3s[1] + 160, 'bld_tires', 0, 0, 0);
 
   /* ---------------- buildings on lots */
   const buildings: Building[] = [];

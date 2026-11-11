@@ -7,7 +7,7 @@ export type CarId = 'van' | 'hatch' | 'sport' | 'jeep' | 'super';
 export type WheelId = 'std' | 'sport' | 'offroad';
 export type VinylId = 'stripes' | 'flames' | 'stars' | 'checker' | 'net';
 export type ItemId = 'oil' | 'cones' | 'glue' | 'boostpad' | 'mine' | 'smoke';
-export type PoiKind = 'lesson' | 'garage' | 'shop' | 'race' | 'fuel' | 'secret';
+export type PoiKind = 'lesson' | 'garage' | 'shop' | 'race' | 'fuel' | 'secret' | 'place';
 
 export interface DistrictDef { id: number; he: string; layer: string; palette: { ground: string; wall: string; roof: string; accent: string; sky: string } }
 export const DISTRICTS: DistrictDef[] = [
@@ -34,7 +34,9 @@ export interface CarStats {
   itemSlots: number;     // 1 or 2
 }
 
-export interface CarLook { car: CarId; paint: string; vinyl: VinylId | null; vinylColor: string; wheels: WheelId; rim: string; spoiler: boolean }
+export interface CarLook { car: CarId; paint: string; vinyl: VinylId | null; vinylColor: string; wheels: WheelId; rim: string; spoiler: boolean;
+  /** traffic dressing: taxi roof sign, patrol light bar, or a motorcycle instead of the car body */
+  extra?: 'taxi' | 'police' | 'moto' }
 
 export interface QuizGate { id: string; q: string; options: [string, string, string]; correct: 0 | 1 | 2; lesson: string }
 
@@ -112,6 +114,9 @@ export interface DriveInput {
   reset: boolean;
   /** optional: enter the POI you stand in (touch button; keyboard E/Enter) */
   action?: boolean;
+  /** optional (touch gear lever): reverse power 0..1. When present the car is in lever mode: `brake` only brakes and
+   *  `throttle` also sets the cruise speed (airplane-style power lever). */
+  reverse?: number;
   /** optional: restart the current race (keyboard T) */
   restart?: boolean;
 }

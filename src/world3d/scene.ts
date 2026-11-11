@@ -127,7 +127,7 @@ export class Scene3D {
     }
     // POI rings
     for (const p of city.pois) {
-      const c = p.kind === 'race' ? '#ffffff' : p.kind === 'lesson' ? '#ffd23f' : p.kind === 'garage' ? '#ff7f6e' : p.kind === 'shop' ? '#4ad6c8' : p.kind === 'fuel' ? '#7fd957' : '#b79ae0';
+      const c = p.kind === 'race' ? '#ffffff' : p.kind === 'lesson' ? '#ffd23f' : p.kind === 'garage' ? '#ff7f6e' : p.kind === 'shop' ? '#4ad6c8' : p.kind === 'fuel' ? '#7fd957' : p.kind === 'place' ? '#9ecbd9' : '#b79ae0';
       const ring = new THREE.Mesh(new THREE.RingGeometry(p.radius - 0.8, p.radius, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75, depthWrite: false }));
       ring.position.set(p.x, city.heightAt(p.x, p.z) + 0.15, p.z);
       ring.renderOrder = 3;
@@ -184,6 +184,24 @@ export class Scene3D {
       p.m.add(o);
     }
     this.raceKey = '';   // rebuild race props with kit gates
+  }
+
+  private marker: THREE.Group | null = null;
+  private markerInfo: { x: number; z: number; label: string } | null = null;
+  /** Mission objective: a tall light beam and a pulsing ring (null removes it). */
+  setMarker(m: { x: number; z: number; label: string } | null): void {
+    if (this.marker) { this.scene.remove(this.marker); this.marker = null; }
+    this.markerInfo = m;
+    if (!m) return;
+    const g = new THREE.Group();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.2, 90, 16, 1, true), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    beam.position.y = 45;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(14.5, 16, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.9, depthWrite: false }));
+    ring.position.y = 0.2; ring.renderOrder = 4;
+    g.add(beam, ring);
+    g.position.set(m.x, this.city.heightAt(m.x, m.z), m.z);
+    this.scene.add(g);
+    this.marker = g;
   }
 
   resize(): void {
@@ -263,6 +281,7 @@ export class Scene3D {
     this.fx.update(dt);
     this.scene.traverse((o) => { if (o.userData.billboard) o.quaternion.copy(cam.quaternion); });
     this.renderer.render(this.scene, cam);
+    if (this.marker) { const k = 1 + Math.sin(this.t * 4) * 0.08; this.marker.children[1]?.scale.set(k, 1, k); }
     this.updateLabels(sim);
   }
 
@@ -508,6 +527,10 @@ export class Scene3D {
           items.push({ x: b.position.x, y: b.position.y + (this.kitLoaded ? 2.3 : 2), z: b.position.z, text: g.gate.options[opt] ?? '', color: cols[opt] ?? '#333', sx: 0, sy: 0, ok: false });
         }
       }
+    }
+    if (this.markerInfo && !race) {
+      const m = this.markerInfo, d = Math.hypot(m.x - p.x, m.z - p.z);
+      if (d > 14) items.push({ x: m.x, y: this.city.heightAt(m.x, m.z) + Math.min(30, 6 + d * 0.05), z: m.z, text: `${m.label} · ${Math.round(d / 10) * 10} מ׳`, color: '#b8860b', sx: 0, sy: 0, ok: false });
     }
     const w = this.container.clientWidth, h = this.container.clientHeight;
     const small = Math.min(w, h) < 420;

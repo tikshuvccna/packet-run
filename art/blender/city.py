@@ -161,8 +161,10 @@ def lamp_post():
 
 import bld_more
 import props
+import bld_special
 REG.update(bld_more.REG)
 REG.update(props.REG)
+REG.update(bld_special.REG)
 
 
 def preview_model(name):

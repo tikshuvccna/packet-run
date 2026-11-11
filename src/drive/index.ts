@@ -48,6 +48,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
   let auto = false;
   let prevSkid = 0;
   let speedLines: HTMLDivElement | null = null;
+  let marker: { x: number; z: number; label: string } | null = null;
   const offs: (() => void)[] = [];
 
   const onKey = (e: KeyboardEvent): void => {
@@ -95,6 +96,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
       inp.brake = Math.max(inp.brake, touch.brake);
       if (Math.abs(touch.steer) > Math.abs(inp.steer)) inp.steer = touch.steer;
       inp.nitro ||= touch.nitro; inp.handbrake ||= touch.handbrake; inp.useItem ||= touch.useItem;
+      if (touch.reverse !== undefined && inp.throttle === touch.throttle && inp.brake === touch.brake) inp.reverse = touch.reverse;
       inp.look ||= touch.look; inp.reset ||= touch.reset; inp.action ||= !!touch.action; inp.restart ||= !!touch.restart;
     }
     if (auto && sim) return botInput(sim);
@@ -107,6 +109,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     city = buildCity(c.seed);
     scene = new Scene3D(container, city, c);
     scene.setCleaned(c.cleaned);
+    scene.setMarker(marker);
     const spawn = c.spawn ?? city.spawn;
     sim = new DriveSim(city, { seed: c.seed, look: c.look, stats: c.stats, spawn, gates: c.gates, traffic: QUALITY[c.quality].traffic, collected: c.collected });
     // prebuild the chunks around the start so the first frame is not empty
@@ -141,7 +144,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     TAPPED.clear();
     if (!paused) {
       // POI entry (rising edge)
-      if (inp.action && !prevAction && nearPoi && !s.race) bus.emit('drive:poi', { id: nearPoi.id, kind: nearPoi.kind, lesson: nearPoi.lesson, race: nearPoi.race });
+      if (inp.action && !prevAction && nearPoi && nearPoi.kind !== 'place' && !s.race) bus.emit('drive:poi', { id: nearPoi.id, kind: nearPoi.kind, lesson: nearPoi.lesson, race: nearPoi.race });
       if (inp.restart && !prevRestart && lastRace) startRace(lastRace);
       acc += dt;
       let steps = 0;
@@ -160,7 +163,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     if (!s.race && city) for (const poi of city.pois) if (Math.hypot(poi.x - p.x, poi.z - p.z) < poi.radius) { np = poi; break; }
     if (np !== nearPoi) {
       nearPoi = np;
-      bus.emit('drive:prompt', np ? { text: `E / Enter: ${np.label}`, id: np.id } : null);
+      bus.emit('drive:prompt', np ? { text: np.kind === 'place' || matchMedia('(pointer: coarse)').matches ? np.label : `E / Enter: ${np.label}`, id: np.id } : null);
     }
     hudT += dt; audioT += dt; posT += dt;
     if (hudT >= 0.1) { hudT = 0; bus.emit('drive:hud', s.hud(nearPoi ? { id: nearPoi.id, label: nearPoi.label, kind: nearPoi.kind } : null)); }
@@ -221,6 +224,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     bus.on('drive:teleport', (t) => { sim?.endRace(); sim?.teleport(t.x, t.z, t.heading); if (sim) scene?.chase.snap(sim.player); }),
     bus.on('drive:start-race', (def) => startRace(def)),
     bus.on('drive:set-look', (look) => { if (!sim || !scene) return; sim.setLook(look); scene.setPlayerLook(sim); }),
+    bus.on('drive:marker', (m) => { marker = m; scene?.setMarker(m); }),
     bus.on('ui:pause', (p) => { paused = p.paused; KEYS.clear(); }),
     bus.on('ui:input', (i) => { touch = i; touchT = performance.now(); }),
     bus.on('ui:clock', () => { /* fuel is shown by the UI; the engine does not need it yet */ }),
