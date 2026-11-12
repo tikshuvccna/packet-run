@@ -50,6 +50,8 @@ export interface CarState {
   lastImpact: number; impactX: number; impactZ: number;
   stuckT: number;
   landImpact: number;        // >0 on the step it landed (m/s)
+  /** body damage 0 (new) .. 1 (wrecked): a badly damaged car is slower */
+  dmg: number;
 }
 
 export function createCar(id: number, carId: CarId, stats: CarStats, x: number, z: number, h: number, terrain?: Terrain, wheels: WheelId = 'std'): CarState {
@@ -64,7 +66,7 @@ export function createCar(id: number, carId: CarId, stats: CarStats, x: number, 
     rearGrip: 1, drifting: false, driftT: 0, driftScore: 0, driftChain: 0, driftTier: 0, turboOut: 0, draft: 0,
     oilT: 0, glueT: 0, bubbleT: 0, ghostT: 0, spinDir: 1,
     pitch: 0, roll: 0, pitchV: 0, rollV: 0, gPitch: 0, gRoll: 0, wheelSpin: 0, skid: 0, surface: 0,
-    lastImpact: 0, impactX: 0, impactZ: 0, stuckT: 0, landImpact: 0,
+    lastImpact: 0, impactX: 0, impactZ: 0, stuckT: 0, landImpact: 0, dmg: 0,
   };
 }
 
@@ -143,7 +145,7 @@ export function stepCar(c: CarState, inp: DriveInput, t: Terrain, dt: number, rn
   else if (!c.airborne && speed > st.topSpeed * 0.55 && c.surface === SURF.road) c.nitro = Math.min(st.nitroCap, c.nitro + st.nitroRegen * dt);
 
   // ---- engine and gears
-  const topEff = st.topSpeed * sg.top * (c.boosting ? st.nitroPower : 1) * (c.glueT > 0 ? 0.45 : 1) * (1 + 0.07 * c.draft);
+  const topEff = st.topSpeed * sg.top * (c.boosting ? st.nitroPower : 1) * (c.glueT > 0 ? 0.45 : 1) * (1 + 0.07 * c.draft) * (1 - 0.3 * Math.max(0, c.dmg - 0.4) / 0.6);
   const absVf = Math.abs(vf);
   const gTop = (g: number): number => (GEAR_TOP[g] ?? 1) * st.topSpeed;
   if (c.gear < 4 && absVf > gTop(c.gear) * 0.97 && c.throttle > 0.1) { c.gear++; c.shiftT = 0.14; }

@@ -36,6 +36,12 @@ export interface SaveData {
   bossWon: boolean;
   /** main story: index of the current mission and of its current step */
   mission: { idx: number; step: number };
+  /** mission list version (2 = the garage mission was added as number two) */
+  mv: number;
+  /** side missions: the running one and how many times each was finished */
+  side: { active: { id: string; step: number } | null; done: Record<string, number> };
+  /** car body health 0..1 */
+  health: number;
   playSeconds: number;
   settings: { quality: 'auto' | 'low' | 'medium' | 'high'; showFps: boolean; musicOn: boolean; sfxOn: boolean; musicVol: number; sfxVol: number };
 }
@@ -50,7 +56,7 @@ export function emptySave(): SaveData {
     upgrades: { engine: 0, nitro: 0, tires: 0, brakes: 0, armor: 0, slots: 0 },
     cars: ['van'], wheels: ['std'], vinyls: [],
     look: { car: 'van', paint: '#f2b134', vinyl: null, vinylColor: '#ffffff', wheels: 'std', rim: '#d8dde3', spoiler: false },
-    lessons: {}, flags: {}, parcels: {}, races: {}, pos: null, bossWon: false, mission: { idx: 0, step: 0 }, playSeconds: 0,
+    lessons: {}, flags: {}, parcels: {}, races: {}, pos: null, bossWon: false, mission: { idx: 0, step: 0 }, mv: 2, side: { active: null, done: {} }, health: 1, playSeconds: 0,
     settings: { quality: 'auto', showFps: false, musicOn: true, sfxOn: true, musicVol: 0.5, sfxVol: 0.8 },
   };
 }
@@ -61,15 +67,19 @@ export function normalize(raw: unknown): SaveData {
   const r = raw as Partial<SaveData>;
   const lessons: Record<string, LessonProgress> = {};
   for (const [k, v] of Object.entries(r.lessons ?? {})) lessons[k] = { ...emptyLesson(), ...(v as Partial<LessonProgress>) };
+  const mission = { ...base.mission, ...(r.mission ?? {}) };
+  // saves from before the garage mission (inserted as number two): keep the player on the same mission
+  if (r.mv === undefined && mission.idx >= 1) mission.idx++;
   return {
-    ...base, ...r, v: SAVE_VERSION, lessons,
+    ...base, ...r, v: SAVE_VERSION, lessons, mv: 2, mission,
+    side: { active: r.side?.active ?? null, done: { ...(r.side?.done ?? {}) } },
+    health: typeof r.health === 'number' ? Math.max(0.05, Math.min(1, r.health)) : 1,
     upgrades: { ...base.upgrades, ...(r.upgrades ?? {}) },
     look: { ...base.look, ...(r.look ?? {}) },
     cars: Array.isArray(r.cars) && r.cars.length ? r.cars : base.cars,
     wheels: Array.isArray(r.wheels) && r.wheels.length ? r.wheels : base.wheels,
     vinyls: Array.isArray(r.vinyls) ? r.vinyls : base.vinyls,
     settings: { ...base.settings, ...(r.settings ?? {}) },
-    mission: { ...base.mission, ...(r.mission ?? {}) },
   };
 }
 

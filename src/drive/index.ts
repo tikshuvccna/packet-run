@@ -48,7 +48,9 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
   let auto = false;
   let prevSkid = 0;
   let speedLines: HTMLDivElement | null = null;
-  let marker: { x: number; z: number; label: string } | null = null;
+  let marker: { x: number; z: number; label: string; side?: boolean; r?: number } | null = null;
+  let sideSpots: { x: number; z: number; label: string; done: boolean }[] = [];
+  let scareT = 0;
   const offs: (() => void)[] = [];
 
   const onKey = (e: KeyboardEvent): void => {
@@ -110,8 +112,10 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     scene = new Scene3D(container, city, c);
     scene.setCleaned(c.cleaned);
     scene.setMarker(marker);
+    scene.setSideSpots(sideSpots);
+    scene.people.onScare = () => { const now = performance.now(); if (now - scareT < 9000) return; scareT = now; bus.emit('drive:toast', { text: 'זהירות! הולכי רגל על המדרכה', kind: 'bad' }); bus.emit('audio:sfx', { name: 'horn', vol: 0.5 }); };
     const spawn = c.spawn ?? city.spawn;
-    sim = new DriveSim(city, { seed: c.seed, look: c.look, stats: c.stats, spawn, gates: c.gates, traffic: QUALITY[c.quality].traffic, collected: c.collected });
+    sim = new DriveSim(city, { seed: c.seed, look: c.look, stats: c.stats, spawn, gates: c.gates, traffic: QUALITY[c.quality].traffic, collected: c.collected, health: c.health });
     // prebuild the chunks around the start so the first frame is not empty
     for (let i = 0; i < 12 && scene.cityMesh.pending + 1 > 0; i++) scene.cityMesh.update(spawn.x, spawn.z, QUALITY[c.quality].draw, 3);
     scene.chase.snap(sim.player);
@@ -144,7 +148,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     TAPPED.clear();
     if (!paused) {
       // POI entry (rising edge)
-      if (inp.action && !prevAction && nearPoi && nearPoi.kind !== 'place' && !s.race) bus.emit('drive:poi', { id: nearPoi.id, kind: nearPoi.kind, lesson: nearPoi.lesson, race: nearPoi.race });
+      if (inp.action && !prevAction && nearPoi && !s.race) bus.emit('drive:poi', { id: nearPoi.id, kind: nearPoi.kind, lesson: nearPoi.lesson, race: nearPoi.race });
       if (inp.restart && !prevRestart && lastRace) startRace(lastRace);
       acc += dt;
       let steps = 0;
@@ -184,6 +188,8 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
         case 'toast': bus.emit('drive:toast', { text: e.text, kind: e.kind }); break;
         case 'pickup': bus.emit('drive:pickup', { kind: e.kind, amount: e.amount, item: e.item, id: e.id }); break;
         case 'gate': bus.emit('drive:gate', { id: e.id, right: e.right }); break;
+        case 'damage': bus.emit('drive:damage', { health: e.health, amount: e.amount, wreck: false }); break;
+        case 'wreck': bus.emit('drive:damage', { health: 0, amount: 0, wreck: true }); break;
         case 'crash': if (e.driver === 0) bus.emit('audio:sfx', { name: 'crash', vol: Math.min(1, e.v / 20) }); break;
         case 'land': bus.emit('audio:sfx', { name: 'jump_land', vol: Math.min(1, e.v / 10) }); break;
         case 'turbo': if (e.driver === 0) { bus.emit('audio:sfx', { name: 'boost', vol: 0.4 + e.tier * 0.2 }); bus.emit('drive:toast', { text: ['', 'טורבו!', 'סופר טורבו!', 'אולטרה טורבו!'][e.tier] ?? 'טורבו!', kind: 'good' }); } break;
@@ -225,6 +231,8 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     bus.on('drive:start-race', (def) => startRace(def)),
     bus.on('drive:set-look', (look) => { if (!sim || !scene) return; sim.setLook(look); scene.setPlayerLook(sim); }),
     bus.on('drive:marker', (m) => { marker = m; scene?.setMarker(m); }),
+    bus.on('drive:side-spots', (l) => { sideSpots = l; scene?.setSideSpots(l); }),
+    bus.on('drive:repair', () => sim?.repair()),
     bus.on('ui:pause', (p) => { paused = p.paused; KEYS.clear(); }),
     bus.on('ui:input', (i) => { touch = i; touchT = performance.now(); }),
     bus.on('ui:clock', () => { /* fuel is shown by the UI; the engine does not need it yet */ }),

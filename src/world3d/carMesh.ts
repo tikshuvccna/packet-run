@@ -247,10 +247,13 @@ export class CarVisual {
   private ready = false;
   bubble: THREE.Mesh | null = null;
   private moto = false;
+  /** own copies of the body geometry that crash damage bends and darkens (player car only) */
+  private deform: { geo: THREE.BufferGeometry; pos: Float32Array; col: Float32Array }[] = [];
+  private dmgKey = '';
 
-  constructor(look: CarLook, readonly opts: { outline: boolean; shadow: boolean; detail: boolean }) {
+  constructor(look: CarLook, readonly opts: { outline: boolean; shadow: boolean; detail: boolean; deform?: boolean }) {
     this.look = { ...look };
-    this.paintMat = new THREE.MeshToonMaterial({ color: look.paint, gradientMap: toonGradient() });
+    this.paintMat = new THREE.MeshToonMaterial({ color: look.paint, gradientMap: toonGradient(), vertexColors: true });
     this.rimMat = new THREE.MeshToonMaterial({ color: look.rim, gradientMap: toonGradient() });
     this.vinylMat = new THREE.MeshToonMaterial({ color: look.vinylColor, gradientMap: toonGradient(), transparent: true, alphaTest: 0.3, polygonOffset: true, polygonOffsetFactor: -2 });
     this.root.add(this.body);
@@ -271,6 +274,13 @@ export class CarVisual {
     this.body.clear();
     this.wheels.forEach((w) => this.root.remove(w));
     this.wheels = []; this.spins = [];
+    this.deform = []; this.dmgKey = '';
+    const own = (g: THREE.BufferGeometry | null): THREE.BufferGeometry | null => {
+      if (!g || !this.opts.deform) return g;
+      const c = g.clone();
+      this.deform.push({ geo: c, pos: Float32Array.from(c.getAttribute('position').array), col: Float32Array.from(c.getAttribute('color').array) });
+      return c;
+    };
     const add = (g: THREE.BufferGeometry | null, m: THREE.Material, parent: THREE.Object3D, outline = this.opts.outline): THREE.Mesh | null => {
       if (!g) return null;
       const mesh = new THREE.Mesh(g, m);
@@ -279,9 +289,9 @@ export class CarVisual {
       if (outline) { const o = new THREE.Mesh(g, outlineMat(0.035)); o.raycast = () => {}; mesh.add(o); }
       return mesh;
     };
-    add(tpl.paint, this.paintMat, this.body);
-    add(tpl.fixed, fixedMat(), this.body);
-    add(tpl.lights, lightMat(), this.body, false);
+    add(own(tpl.paint), this.paintMat, this.body);
+    add(own(tpl.fixed), fixedMat(), this.body);
+    add(own(tpl.lights), lightMat(), this.body, false);
     if (this.opts.detail) {
       this.vinylMesh = add(tpl.vinyl, this.vinylMat, this.body, false);
       this.spoiler = new THREE.Group();
@@ -345,6 +355,34 @@ export class CarVisual {
     }
     this.spoiler.visible = look.spoiler;
     if (prev.wheels !== look.wheels) void this.setWheels(look.wheels);
+  }
+
+  /** Crash damage per zone [front, rear, left, right] 0..1: crumples the body toward the inside and darkens it. */
+  setDamage(z: readonly number[]): void {
+    if (!this.ready || !this.deform.length) return;
+    const key = z.map((v) => v.toFixed(2)).join();
+    if (key === this.dmgKey) return;
+    this.dmgKey = key;
+    const d = CAR_DIMS[this.look.car], hl = d.length / 2, hw = d.width / 2;
+    const sm = (v: number): number => { const t = Math.max(0, Math.min(1, v)); return t * t * (3 - 2 * t); };
+    const hash = (x: number, y: number, zz: number, k: number): number => { const s = Math.sin(Math.round(x * k) * 12.9898 + Math.round(y * k) * 78.233 + Math.round(zz * k) * 37.719) * 43758.5453; return s - Math.floor(s); };
+    const [zf = 0, zr = 0, zl = 0, zR = 0] = z;
+    for (const it of this.deform) {
+      const pos = it.geo.getAttribute('position') as THREE.BufferAttribute, col = it.geo.getAttribute('color') as THREE.BufferAttribute;
+      const pa = pos.array as Float32Array, ca = col.array as Float32Array;
+      for (let i = 0; i < pos.count; i++) {
+        const x = it.pos[i * 3] as number, y = it.pos[i * 3 + 1] as number, zz = it.pos[i * 3 + 2] as number;
+        const n = hash(x, y, zz, 7), n2 = hash(x, y, zz, 3.1);
+        const f = zf * sm((-zz - hl * 0.3) / (hl * 0.7)), r = zr * sm((zz - hl * 0.3) / (hl * 0.7));
+        const l = zl * sm((-x - hw * 0.35) / (hw * 0.65)), rr = zR * sm((x - hw * 0.35) / (hw * 0.65));
+        pa[i * 3] = x + (l - rr) * 0.2 * (0.35 + n) + (f + r) * (n2 - 0.5) * 0.1;
+        pa[i * 3 + 1] = y - (f + r) * 0.12 * n * (y > 0.55 ? 1 : 0.2) + (l + rr) * (n - 0.5) * 0.06;
+        pa[i * 3 + 2] = zz + (f - r) * 0.42 * (0.3 + n);
+        const shade = 1 - Math.min(0.62, (f + r + l + rr) * (0.15 + 0.7 * n2));
+        ca[i * 3] = (it.col[i * 3] as number) * shade; ca[i * 3 + 1] = (it.col[i * 3 + 1] as number) * shade; ca[i * 3 + 2] = (it.col[i * 3 + 2] as number) * shade;
+      }
+      pos.needsUpdate = true; col.needsUpdate = true;
+    }
   }
 
   /** Pose from the sim state. t = time (for flicker). */

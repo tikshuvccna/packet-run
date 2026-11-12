@@ -71,6 +71,8 @@ export interface DriveConfig {
   twoPlayers?: boolean;
   /** pickup ids already collected (coins, hidden parcels) so they stay gone */
   collected?: string[];
+  /** car body health 0..1 from the save (default 1) */
+  health?: number;
 }
 
 export interface HudState {
@@ -91,6 +93,8 @@ export interface HudState {
   wrongWay: boolean; drift: number; combo: number;
   /** optional extras (engine): drift mini-turbo tier 0..3, nitro active, slipstream 0..1 */
   driftTier?: number; boosting?: boolean; draft?: number;
+  /** car body health 0..1 (1 = like new) */
+  health?: number;
 }
 
 export interface RaceResult {

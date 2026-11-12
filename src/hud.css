@@ -13,6 +13,15 @@ body.modal .hud { visibility: hidden; }
 .missionbox b { color: #ffd23f; font-size: .76rem; }
 .missionbox .mtimer { color: #9bf3ff; font-weight: 900; font-variant-numeric: tabular-nums; direction: ltr; text-align: right; }
 .missionbox .mtimer.low { color: #ff8a80; animation: pulse 1s infinite; }
+.missionbox.side { border-color: #b56cff; background: rgba(34, 14, 58, .86); }
+.missionbox.side b { color: #d9b3ff; }
+.missionbox .mnote { color: #ffd0f0; font-size: .74rem; }
+.prompt.side { border-color: #b56cff; color: #ecd9ff; background: rgba(34, 14, 58, .92); }
+.bar-fill.car { background: linear-gradient(90deg, #6fb6ff, #bfe0ff); }
+.cargauge { margin-top: -2px; }
+.hitflash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(229, 60, 50, .55) 100%); }
+.hitflash.on { animation: hitflash .45s ease-out; }
+@keyframes hitflash { from { opacity: 1; } to { opacity: 0; } }
 .minimap { width: min(140px, 26vw); height: min(140px, 26vw); border-radius: 50%; background: rgba(8, 26, 45, .6); border: 3px solid var(--brass); }
 .fuelgauge { display: flex; align-items: center; gap: 6px; direction: rtl; width: min(160px, 34vw); }
 .fuel-label { font-size: .75rem; font-weight: 800; text-shadow: 0 1px 2px #000; }

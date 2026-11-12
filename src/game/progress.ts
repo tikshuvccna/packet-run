@@ -51,7 +51,7 @@ export const UPGRADE_HE: Record<UpgradeId, string> = {
   engine: 'מנוע', nitro: 'נייטרוס', tires: 'צמיגים', brakes: 'בלמים', armor: 'שריון', slots: 'כיס פריטים',
 };
 export const UPGRADE_DESC: Record<UpgradeId, string> = {
-  engine: 'מהירות מירבית ותאוצה', nitro: 'יותר נייטרוס ומילוי מהיר', tires: 'אחיזה ופניות חדות', brakes: 'בלימה קצרה', armor: 'פחות איבוד מהירות בהתנגשות', slots: 'שני פריטים ביד',
+  engine: 'מהירות מירבית ותאוצה', nitro: 'יותר נייטרוס ומילוי מהיר', tires: 'אחיזה ופניות חדות', brakes: 'בלימה קצרה', armor: 'פחות נזק ופחות איבוד מהירות בהתנגשות', slots: 'שני פריטים ביד',
 };
 export const UPGRADE_PRICE: Record<UpgradeId, number[]> = {
   engine: [80, 160, 300], nitro: [70, 140, 260], tires: [60, 120, 220], brakes: [40, 90, 170], armor: [50, 110, 200], slots: [150],

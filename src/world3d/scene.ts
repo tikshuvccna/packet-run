@@ -7,15 +7,16 @@ import { CarVisual } from './carMesh';
 import type { City } from './city';
 import { CityMesh } from './cityMesh';
 import { Particles, SkidMarks } from './fx';
+import { People } from './people';
 import { Sky } from './sky';
 import { lightState, type Light } from '../drive/sim/lights';
 import { kitModel, kitObject, loadKit, partGeometry, setKitMaterials } from './kit';
 import { textTexture, toon, toonGradient } from './toon';
 
 export const QUALITY = {
-  low: { pr: 0.75, shadows: false, outlines: false, draw: 300, traffic: 8, shadowSize: 0, particles: 0.5 },
-  medium: { pr: 1.25, shadows: true, outlines: true, draw: 460, traffic: 14, shadowSize: 1024, particles: 1 },
-  high: { pr: 2, shadows: true, outlines: true, draw: 620, traffic: 20, shadowSize: 2048, particles: 1 },
+  low: { pr: 0.75, shadows: false, outlines: false, draw: 300, traffic: 8, shadowSize: 0, particles: 0.5, people: 10 },
+  medium: { pr: 1.25, shadows: true, outlines: true, draw: 460, traffic: 14, shadowSize: 1024, particles: 1, people: 22 },
+  high: { pr: 2, shadows: true, outlines: true, draw: 620, traffic: 20, shadowSize: 2048, particles: 1, people: 34 },
 } as const;
 
 const ITEM_COLORS: Record<ItemId, string> = { oil: '#2b2233', cones: '#ff8a2a', glue: '#9be36a', boostpad: '#2dc4e8', mine: '#ff7fb0', smoke: '#d8dde3' };
@@ -29,6 +30,7 @@ export class Scene3D {
   private sun: THREE.DirectionalLight;
   private cars = new Map<number, CarVisual>();
   private fx: Particles;
+  readonly people: People;
   private skids = new SkidMarks();
   private coinMesh: THREE.InstancedMesh;
   private coinIds: { id: string; x: number; y: number; z: number }[] = [];
@@ -91,7 +93,8 @@ export class Scene3D {
     this.scene.add(this.cityMesh.group);
     this.fx = new Particles(this.renderer.getPixelRatio());
     this.fx.scale = this.q.particles;
-    this.scene.add(this.fx.points, this.skids.mesh, this.raceGroup);
+    this.people = new People(city, this.q.people, this.q.shadows);
+    this.scene.add(this.fx.points, this.skids.mesh, this.raceGroup, this.people.group);
 
     // pickups: coins + item boxes instanced, nitro pads + parcels as meshes
     const coins = city.pickups.filter((p) => p.kind === 'coin');
@@ -187,21 +190,52 @@ export class Scene3D {
   }
 
   private marker: THREE.Group | null = null;
-  private markerInfo: { x: number; z: number; label: string } | null = null;
-  /** Mission objective: a tall light beam and a pulsing ring (null removes it). */
-  setMarker(m: { x: number; z: number; label: string } | null): void {
+  private markerInfo: { x: number; z: number; label: string; side?: boolean; r?: number } | null = null;
+  /** Mission objective: a tall light beam and a pulsing ring (null removes it). Yellow = main story, purple = side mission. */
+  setMarker(m: { x: number; z: number; label: string; side?: boolean; r?: number } | null): void {
     if (this.marker) { this.scene.remove(this.marker); this.marker = null; }
     this.markerInfo = m;
     if (!m) return;
     const g = new THREE.Group();
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.2, 90, 16, 1, true), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    const mc = m.side ? SIDE_COLOR : '#ffd23f';
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.2, 90, 16, 1, true), new THREE.MeshBasicMaterial({ color: mc, transparent: true, opacity: m.side ? 0.38 : 0.3, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     beam.position.y = 45;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(14.5, 16, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.9, depthWrite: false }));
+    const rr = m.r ?? 16;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(rr - 1.5, rr, 56).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: mc, transparent: true, opacity: 0.9, depthWrite: false }));
     ring.position.y = 0.2; ring.renderOrder = 4;
     g.add(beam, ring);
     g.position.set(m.x, this.city.heightAt(m.x, m.z), m.z);
     this.scene.add(g);
     this.marker = g;
+  }
+
+  private sideGroup = new THREE.Group();
+  private sideSpots: { x: number; z: number; label: string; done: boolean; gem: THREE.Object3D }[] = [];
+  /** Side-mission givers: a purple spinning gem with an exclamation mark over a purple ring (grey-lilac when already done). */
+  setSideSpots(list: { x: number; z: number; label: string; done: boolean }[]): void {
+    this.sideGroup.clear();
+    if (!this.sideGroup.parent) this.scene.add(this.sideGroup);
+    this.sideSpots = list.map((s) => {
+      const y = this.city.heightAt(s.x, s.z);
+      const c = s.done ? '#a99bc4' : SIDE_COLOR;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(10.6, 12, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, depthWrite: false }));
+      ring.position.set(s.x, y + 0.22, s.z); ring.renderOrder = 4;
+      const gem = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.OctahedronGeometry(s.done ? 1.1 : 1.7), toon(c, { emissive: c, emissiveIntensity: 0.55 }));
+      body.scale.y = 1.35;
+      gem.add(body);
+      if (!s.done) {
+        const mark = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: textTexture('!', { w: 128, h: 128, bg: SIDE_COLOR, fg: '#ffffff', border: '#ffffff' }), transparent: true, side: THREE.DoubleSide }));
+        mark.position.y = 4.2; mark.userData.billboard = true;
+        gem.add(mark);
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 26, 8, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+        beam.position.y = 9;
+        gem.add(beam);
+      }
+      gem.position.set(s.x, y + 5, s.z);
+      this.sideGroup.add(ring, gem);
+      return { ...s, gem };
+    });
   }
 
   resize(): void {
@@ -217,7 +251,7 @@ export class Scene3D {
     let v = this.cars.get(d.car.id);
     if (!v) {
       const detail = d.kind !== 'traffic';
-      v = new CarVisual(d.look, { outline: this.q.outlines && detail, shadow: this.q.shadows && d.kind === 'player', detail });
+      v = new CarVisual(d.look, { outline: this.q.outlines && detail, shadow: this.q.shadows && d.kind === 'player', detail, deform: d.kind === 'player' });
       this.cars.set(d.car.id, v);
       this.scene.add(v.root);
     }
@@ -247,6 +281,7 @@ export class Scene3D {
       if (!v) continue;
       alive.add(d.car.id);
       v.update(d.car, this.t);
+      if (d.kind === 'player') { v.setDamage(sim.zones); this.damageFx(sim, dt); }
       v.root.visible = d.car.ghostT <= 0 || Math.floor(this.t * 12) % 2 === 0 || d.kind !== 'player';
       this.carFx(d.car, d.kind === 'player', i);
     }
@@ -279,10 +314,21 @@ export class Scene3D {
     this.items(sim);
     this.race(sim);
     this.fx.update(dt);
+    this.people.update(dt, this.nearCars(sim), this.t);
+    for (const [k, s] of this.sideSpots.entries()) { const b = s.gem.children[0]; if (b) b.rotation.y = this.t * 1.6 + k; s.gem.position.y = this.city.heightAt(s.x, s.z) + 5 + Math.sin(this.t * 2 + k) * 0.5; }
     this.scene.traverse((o) => { if (o.userData.billboard) o.quaternion.copy(cam.quaternion); });
     this.renderer.render(this.scene, cam);
     if (this.marker) { const k = 1 + Math.sin(this.t * 4) * 0.08; this.marker.children[1]?.scale.set(k, 1, k); }
     this.updateLabels(sim);
+  }
+
+  private carList: import('../drive/sim/car').CarState[] = [];
+  /** the player's car first, then every car close enough to bother someone on the sidewalk */
+  private nearCars(sim: DriveSim): import('../drive/sim/car').CarState[] {
+    const p = sim.player, out = this.carList;
+    out.length = 0; out.push(p);
+    for (let i = 1; i < sim.drivers.length; i++) { const c = (sim.drivers[i] as (typeof sim.drivers)[number]).car; if (Math.abs(c.x - p.x) < 200 && Math.abs(c.z - p.z) < 200) out.push(c); }
+    return out;
   }
 
   private lightPoles = new Map<number, { g: THREE.Group; lamps: { m: THREE.MeshBasicMaterial; axisX: boolean; kind: Light }[] }>();
@@ -364,6 +410,18 @@ export class Scene3D {
     v.root.visible = true;
     v.root.position.set(gp.x, gp.y, gp.z);
     v.root.rotation.set(0, -gp.h, 0);
+  }
+
+  /** Smoke from the bonnet of a damaged car (darker and thicker as it gets worse). */
+  private damageFx(sim: DriveSim, dt: number): void {
+    const h = sim.health;
+    if (h >= 0.6 || dt <= 0) return;
+    const c = sim.player, k = (0.6 - h) / 0.6;
+    if (Math.random() > dt * (6 + 26 * k) && sim.stallT <= 0) return;
+    const fx = Math.sin(c.h), fz = -Math.cos(c.h);
+    const x = c.x + fx * c.dims.length * 0.32 + (Math.random() - 0.5) * 0.8, z = c.z + fz * c.dims.length * 0.32 + (Math.random() - 0.5) * 0.8;
+    const g = h < 0.3 ? 0.22 : 0.75;
+    this.fx.emit(x, c.y + c.dims.height * 0.55, z, c.vx * 0.5 + (Math.random() - 0.5), 1.6 + Math.random() * 1.4, c.vz * 0.5 + (Math.random() - 0.5), 1.2 + Math.random() * 0.8, 0.5 + k * 0.5, 2.2, g, g, g * 1.03, 0.55);
   }
 
   private cleanedSet = new Set<number>();
@@ -530,7 +588,11 @@ export class Scene3D {
     }
     if (this.markerInfo && !race) {
       const m = this.markerInfo, d = Math.hypot(m.x - p.x, m.z - p.z);
-      if (d > 14) items.push({ x: m.x, y: this.city.heightAt(m.x, m.z) + Math.min(30, 6 + d * 0.05), z: m.z, text: `${m.label} · ${Math.round(d / 10) * 10} מ׳`, color: '#b8860b', sx: 0, sy: 0, ok: false });
+      if (d > 14) items.push({ x: m.x, y: this.city.heightAt(m.x, m.z) + Math.min(30, 6 + d * 0.05), z: m.z, text: `${m.label} · ${Math.round(d / 10) * 10} מ׳`, color: m.side ? SIDE_DARK : '#b8860b', sx: 0, sy: 0, ok: false });
+    }
+    if (!race) for (const s of this.sideSpots) {
+      const d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < 170 && d > 9) items.push({ x: s.x, y: this.city.heightAt(s.x, s.z) + 10.5, z: s.z, text: s.done ? `✓ ${s.label}` : `משימת צד: ${s.label}`, color: s.done ? '#7d7392' : SIDE_DARK, sx: 0, sy: 0, ok: false });
     }
     const w = this.container.clientWidth, h = this.container.clientHeight;
     const small = Math.min(w, h) < 420;
@@ -574,6 +636,10 @@ export class Scene3D {
     this.labels.remove();
   }
 }
+
+/** side missions are always purple (beam, ring, gem, labels, HUD box, minimap) */
+export const SIDE_COLOR = '#b56cff';
+const SIDE_DARK = '#7b3fc4';
 
 function itemMesh(kind: ItemId): THREE.Object3D {
   const c = ITEM_COLORS[kind];

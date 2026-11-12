@@ -4,7 +4,13 @@ import type { CarLook, DriveConfig, DriveInput, HudState, ItemId, RaceDef, RaceR
 export interface GameEvents {
   /** Drive -> UI */
   'drive:hud': HudState;
-  'drive:marker': { x: number; z: number; label: string } | null;
+  'drive:marker': { x: number; z: number; label: string; side?: boolean; /** ring radius (m) */ r?: number } | null;
+  /** side-mission givers shown in the world (purple gems) */
+  'drive:side-spots': { x: number; z: number; label: string; done: boolean }[];
+  /** the player's car took a hit (wreck = it broke down) */
+  'drive:damage': { health: number; amount: number; wreck: boolean };
+  /** UI -> Drive: fix the car */
+  'drive:repair': undefined;
   'drive:prompt': { text: string; id: string } | null;
   'drive:toast': { text: string; kind?: 'info' | 'good' | 'bad' };
   'drive:poi': { id: string; kind: string; lesson?: string; race?: RaceDef };   // the player pressed enter inside a POI circle

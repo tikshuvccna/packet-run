@@ -7,6 +7,9 @@ import { btn, h } from './dom';
 const ITEM_HE: Record<ItemId, string> = { oil: 'שמן', cones: 'חרוטים', glue: 'דבק', boostpad: 'רמפת טורבו', mine: 'בועה מגנטית', smoke: 'עשן' };
 const ITEM_COLOR: Record<ItemId, string> = { oil: '#2b2f3a', cones: '#ff9a3c', glue: '#7fd957', boostpad: '#35d3b0', mine: '#9b59d0', smoke: '#c0c8d0' };
 
+/** The mission box: side missions are purple and say so in the title. */
+export interface MissionView { title: string; text: string; sec: number | null; side?: boolean; note?: string }
+
 export interface MiniMapProvider { draw(ctx2d: CanvasRenderingContext2D, w: number, h: number, s: HudState): void }
 
 /** Driving overlay: speed, nitro, items, race info, quiz-box banner, fuel (the 10 minute clock), touch controls (physical left/right: RTL must never swap them). */
@@ -18,7 +21,11 @@ export class Hud {
   private coinText: HTMLElement;
   private raceBox: HTMLElement;
   private missionBox: HTMLElement;
-  private mission: { title: string; text: string; sec: number | null } | null = null;
+  private mission: MissionView | null = null;
+  /** set by the flow: the title of the side mission offered at a place, or null */
+  sideOffer: ((poi: string) => string | null) | null = null;
+  private carFill: HTMLElement;
+  private hitEl: HTMLElement;
   private banner: HTMLElement;
   private promptEl: HTMLElement;
   private toasts: HTMLElement;
@@ -56,7 +63,11 @@ export class Hud {
     const fuel = h('div', 'fuelgauge');
     fuel.appendChild(h('span', 'fuel-label', 'דלק'));
     const ft = h('div', 'bar-track'); this.fuelFill = h('div', 'bar-fill fuel'); ft.appendChild(this.fuelFill); fuel.appendChild(ft);
-    const rcol = h('div', 'hud-rcol'); rcol.append(right, this.map, fuel);
+    const car = h('div', 'fuelgauge cargauge');
+    car.appendChild(h('span', 'fuel-label', 'רכב'));
+    const ct = h('div', 'bar-track'); this.carFill = h('div', 'bar-fill car'); ct.appendChild(this.carFill); car.appendChild(ct);
+    const rcol = h('div', 'hud-rcol'); rcol.append(right, this.map, fuel, car);
+    this.hitEl = h('div', 'hitflash');
     top.append(left, rcol);
 
     this.banner = h('div', 'qbanner hidden');
@@ -90,11 +101,17 @@ export class Hud {
     const back = this.holdBtn('abtn resetbtn', 'חזרה לכביש', () => { this.input.reset = true; }, () => { this.input.reset = false; });
     const look = this.holdBtn('abtn lookbtn', 'מאחור', () => { this.input.look = true; }, () => { this.input.look = false; });
 
-    r.append(top, this.banner, this.wrongWay, this.comboEl, this.promptEl, this.toasts, dash, steer, pedals, this.actBtn, back, look);
+    r.append(this.hitEl, top, this.banner, this.wrongWay, this.comboEl, this.promptEl, this.toasts, dash, steer, pedals, this.actBtn, back, look);
 
     this.offs.push(
       bus.on('drive:hud', (s) => this.update(s)),
-      bus.on('drive:prompt', (p) => { this.promptEl.textContent = p?.text ?? ''; this.promptEl.classList.toggle('hidden', !p); }),
+      bus.on('drive:prompt', (p) => {
+        const side = p ? this.sideOffer?.(p.id) ?? null : null;
+        this.promptEl.textContent = side ? (this.touchMode ? `משימת צד: ${side}` : `E / Enter: משימת צד · ${side}`) : p?.text ?? '';
+        this.promptEl.classList.toggle('side', !!side);
+        this.promptEl.classList.toggle('hidden', !p);
+      }),
+      bus.on('drive:damage', (d) => { if (d.amount > 0.02 || d.wreck) { this.hitEl.classList.remove('on'); void this.hitEl.offsetWidth; this.hitEl.classList.add('on'); } }),
       bus.on('drive:toast', (t) => this.toast(t.text, t.kind)),
       bus.on('ui:pause', (p) => { if (p.paused) this.setLever(0); }),
       bus.on('ui:clock', (c) => { this.fuelFill.style.width = `${Math.max(0, Math.min(1, c.fuel)) * 100}%`; this.fuelFill.classList.toggle('low', c.fuel < 0.25); }),
@@ -106,12 +123,14 @@ export class Hud {
   destroy(): void { this.offs.forEach((o) => o()); this.root.remove(); this.bus.emit('ui:input', { ...NO_INPUT }); }
   setMiniMap(p: MiniMapProvider | null): void { this.mapProvider = p; this.map.classList.toggle('hidden', !p); }
   /** Current mission step (null hides the box). sec = seconds left of a time limit. */
-  setMission(m: { title: string; text: string; sec: number | null } | null): void {
+  setMission(m: MissionView | null): void {
     this.mission = m;
     this.missionBox.textContent = '';
+    this.missionBox.classList.toggle('side', !!m?.side);
     this.missionBox.classList.toggle('hidden', !m || !!this.last?.race);
     if (!m) return;
     this.missionBox.append(h('b', null, m.title), h('span', null, m.text));
+    if (m.note) this.missionBox.appendChild(h('span', 'mnote', m.note));
     if (m.sec !== null) { const t = h('span', 'mtimer', fmtTime(Math.max(0, m.sec)).replace(/\.\d$/, '')); if (m.sec <= 15) t.classList.add('low'); this.missionBox.appendChild(t); }
   }
   setCoins(n: number): void { this.coinText.textContent = String(Math.round(n)); }
@@ -127,7 +146,10 @@ export class Hud {
       i.style.borderColor = ITEM_COLOR[it];
       this.itemsEl.appendChild(i);
     }
-    this.actBtn.classList.toggle('hidden', !s.nearPoi || s.nearPoi.kind === 'place' || !!s.race);
+    this.actBtn.classList.toggle('hidden', !s.nearPoi || (s.nearPoi.kind === 'place' && !this.sideOffer?.(s.nearPoi.id)) || !!s.race);
+    const hp = Math.max(0, Math.min(1, s.health ?? 1));
+    this.carFill.style.width = `${hp * 100}%`;
+    this.carFill.classList.toggle('low', hp < 0.35);
     this.wrongWay.classList.toggle('hidden', !s.wrongWay);
     this.comboEl.textContent = s.combo > 1 ? `קומבו ${s.combo}` : '';
     this.comboEl.classList.toggle('hidden', s.combo <= 1);

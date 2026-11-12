@@ -18,7 +18,14 @@ const CITY_SEED = 11;                       // the same seed the flow gives the 
 const city = buildCity(CITY_SEED);
 flow.setCity({
   lessonPoi: (id) => `garage_${id}`,
-  poiRaw: (id) => { const p = city.pois.find((x) => x.id === id); return p ? { x: p.x, z: p.z, label: p.label } : null; },
+  poiRaw: (id) => {
+    const p = city.pois.find((x) => x.id === id);
+    if (!p) return null;
+    // the mission ring reaches across the whole road in front of the place, so either lane counts
+    const r = city.nearestRoad(p.x, p.z);
+    const reach = Math.min(30, Math.max(16, r.d + (city.edges[r.edge]?.width ?? 11) / 2 + 1));
+    return { x: p.x, z: p.z, label: p.label, reach };
+  },
   poiPos: (id) => {
     const p = city.pois.find((x) => x.id === id);
     if (!p) return null;
@@ -28,7 +35,7 @@ flow.setCity({
   minimap: {
     draw: (g, _w, _h, s) => {
       const target = flow.objective();
-      drawMinimap(g, city, { x: s.x, z: s.z, heading: s.heading, span: 520, rotate: true, pois: city.pois, target });
+      drawMinimap(g, city, { x: s.x, z: s.z, heading: s.heading, span: 520, rotate: true, pois: city.pois, target, sides: flow.sideSpots() });
     },
   },
 });

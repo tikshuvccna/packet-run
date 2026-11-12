@@ -6,7 +6,8 @@ export interface MinimapOpts {
   /** player pose */ x: number; z: number; heading: number;
   /** meters shown across the canvas (default 600); 0 = whole map */ span?: number;
   /** rotate so the car points up (default true) */ rotate?: boolean;
-  pois?: Poi[]; target?: { x: number; z: number } | null;
+  pois?: Poi[]; target?: { x: number; z: number; side?: boolean } | null;
+  /** side-mission givers (purple diamonds) */ sides?: { x: number; z: number; done: boolean }[];
   racePath?: { x: number; z: number }[] | null;
   rivals?: { x: number; z: number }[];
 }
@@ -47,12 +48,17 @@ export function drawMinimap(g: CanvasRenderingContext2D, city: City, o: MinimapO
   const dot = (x: number, z: number, r: number, c: string): void => { g.fillStyle = c; g.beginPath(); g.arc(x, z, r / sc, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#1b1f2a'; g.lineWidth = 1.5 / sc; g.stroke(); };
   for (const p of o.pois ?? city.pois) dot(p.x, p.z, p.kind === 'race' ? 4 : 6, poiColor[p.kind] ?? '#fff');
   for (const r of o.rivals ?? []) dot(r.x, r.z, 4, '#e55a4e');
+  for (const sd of o.sides ?? []) {
+    const r = 7.5 / sc;
+    g.fillStyle = sd.done ? '#a99bc4' : '#b56cff'; g.strokeStyle = '#ffffff'; g.lineWidth = 1.6 / sc;
+    g.beginPath(); g.moveTo(sd.x, sd.z - r); g.lineTo(sd.x + r * 0.75, sd.z); g.lineTo(sd.x, sd.z + r); g.lineTo(sd.x - r * 0.75, sd.z); g.closePath(); g.fill(); g.stroke();
+  }
   if (o.target) {
     // keep the objective on the map edge when it is far away
     let tx = o.target.x, tz = o.target.z;
     if (o.span !== 0) { const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz), lim = (Math.min(W, H) / 2 - 9) / sc; if (d > lim) { tx = o.x + (dx / d) * lim; tz = o.z + (dz / d) * lim; } }
-    dot(tx, tz, 8, '#ffd23f');
-    dot(tx, tz, 3.5, '#e5484d');
+    dot(tx, tz, 8, o.target.side ? '#b56cff' : '#ffd23f');
+    dot(tx, tz, 3.5, o.target.side ? '#ffffff' : '#e5484d');
   }
   // player arrow
   g.translate(o.x, o.z); g.rotate(o.heading); g.scale(1 / sc, 1 / sc);

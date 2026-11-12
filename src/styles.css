@@ -39,6 +39,22 @@ html, body { margin: 0; height: 100%; background: #04101c; color: var(--foam); f
 .screen.title-screen { flex-direction: column; gap: 22px; background: radial-gradient(ellipse at 50% 100%, #1b6d92, #0a2742 55%, #04101c); }
 .lcard { width: min(720px, 100%); max-height: 100%; overflow: auto; background: linear-gradient(#fff6dc, var(--parch)); color: var(--ink); border: 3px solid var(--brass2); border-radius: 18px; padding: clamp(14px, 3vw, 26px); box-shadow: var(--shadow); }
 .lcard h2 { margin: 0 0 8px; font-size: clamp(1.15rem, 3.4vw, 1.6rem); }
+/* side missions: always purple, always labelled */
+.lcard.sidecard { width: min(460px, 100%); border-color: #8a4fd6; background: linear-gradient(#f6ecff, #eadcff); text-align: center; }
+.sidetag { display: inline-block; background: #7b3fc4; color: #fff; font-weight: 900; border-radius: 99px; padding: 3px 14px; font-size: .85rem; margin-bottom: 8px; }
+.sidepitch { margin: 4px 0 10px; font-weight: 600; }
+.sidefacts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.sidefact { background: rgba(123, 63, 196, .14); border: 2px solid #b999e6; border-radius: 10px; padding: 3px 10px; font-weight: 800; font-size: .9rem; }
+.sidenote { margin: 4px 0 10px; font-size: .85rem; opacity: .8; }
+.siderow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+.lcard.mlist { width: min(520px, 100%); }
+.mrow { display: flex; flex-direction: column; gap: 1px; border-radius: 10px; padding: 5px 10px; margin-bottom: 5px; text-align: right; }
+.mrow span { font-size: .85rem; opacity: .85; }
+.mrow.main { background: rgba(255, 210, 63, .28); border: 2px solid #e0a940; }
+.mrow.side { background: rgba(123, 63, 196, .1); border: 2px solid #c9b0ec; }
+.mrow.side.done { opacity: .75; }
+.mrow.side.on { border-color: #7b3fc4; background: rgba(123, 63, 196, .22); }
+.mside-h { margin: 10px 0 2px; color: #7b3fc4; font-size: 1.05rem; }
 .panel { background: rgba(8, 26, 45, .08); border-radius: 10px; padding: 8px 12px; margin: 8px 0; min-height: 38px; font-weight: 600; }
 .screen .lcard .panel.dim { opacity: .8; font-weight: 500; }
 .coinpill { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,.35); padding: 4px 12px 4px 10px; border-radius: 99px; color: #ffe39a; font-weight: 800; }
@@ -316,3 +332,4 @@ html, body { margin: 0; height: 100%; background: #04101c; color: var(--foam); f
 .container.broken { opacity: .2; transform: rotate(-12deg) translateY(40px); }
 .cranestack { display: flex; justify-content: center; margin: 10px 0; min-height: 100px; }
 .cranestack .nestcore.dim { opacity: .5; }
+.sidecard .btn.ghost, .mlist .btn.ghost { color: #5a3a8c; border-color: #b999e6; background: rgba(255, 255, 255, .55); }

@@ -9,7 +9,7 @@ w, h = [int(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "740x360").split(
 base = sys.argv[3] if len(sys.argv) > 3 else "http://localhost:5211/"
 
 OVERLAP = """() => {
-  const sel = ['.wheel', '.gearbox', '.abtn.brake', '.abtn.nitro', '.abtn.throwit', '.abtn.drift', '.abtn.resetbtn', '.abtn.lookbtn', '.dash', '.minimap', '.fuelgauge', '.missionbox', '.abtn.act'];
+  const sel = ['.wheel', '.gearbox', '.abtn.brake', '.abtn.nitro', '.abtn.throwit', '.abtn.drift', '.abtn.resetbtn', '.abtn.lookbtn', '.dash', '.minimap', '.fuelgauge', '.cargauge', '.missionbox', '.abtn.act'];
   const rs = sel.map(s => { const e = document.querySelector(s); if (!e) return null; const st = getComputedStyle(e); if (st.display === 'none' || e.classList.contains('hidden')) return null; const r = e.getBoundingClientRect(); return r.width ? { s, r } : null; }).filter(Boolean);
   const bad = [];
   for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {

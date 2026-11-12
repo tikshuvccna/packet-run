@@ -34,11 +34,14 @@ export type SimEvent =
   | { t: 'land'; driver: number; v: number }
   | { t: 'turbo'; driver: number; tier: number }
   | { t: 'itemHit'; kind: ItemId; x: number; z: number; driver: number }
-  | { t: 'nearMiss' };
+  | { t: 'nearMiss' }
+  /** the player's car took a hit (health after it) or was repaired (amount 0) */
+  | { t: 'damage'; amount: number; health: number }
+  | { t: 'wreck' };
 
 export interface SimConfig {
   seed: number; look: CarLook; stats: CarStats; spawn: { x: number; z: number; heading: number };
-  gates: QuizGate[]; traffic: number; collected?: string[]; pois?: { id: string; kind: PoiKind; x: number; z: number; radius: number; label: string }[];
+  gates: QuizGate[]; traffic: number; collected?: string[]; health?: number; pois?: { id: string; kind: PoiKind; x: number; z: number; radius: number; label: string }[];
 }
 
 export class DriveSim {
@@ -66,6 +69,12 @@ export class DriveSim {
   private stuckWarn = 0;
   private recT = 0;
   private trafficT = 0;
+  /** player car body: health 1..0 and visual damage per zone [front, rear, left, right] 0..1 */
+  health = 1;
+  zones: [number, number, number, number] = [0, 0, 0, 0];
+  private dmgT = -10;
+  /** > 0: the wrecked car stands still for an emergency fix */
+  stallT = 0;
   /** last (finished) race result, kept until the next race */
   lastResult: RaceResult | null = null;
 
@@ -80,6 +89,30 @@ export class DriveSim {
     const p = createCar(0, cfg.look.car, cfg.stats, cfg.spawn.x, cfg.spawn.z, cfg.spawn.heading, city, cfg.look.wheels);
     this.drivers.push({ car: p, kind: 'player', name: 'player', look: cfg.look, items: [], racer: null, traffic: null, prevUse: false, near: false, nearT: 0 });
     this.fillTraffic(true);
+    if (cfg.health !== undefined && cfg.health < 1) { this.health = clamp(cfg.health, 0.05, 1); p.dmg = 1 - this.health; const z = (1 - this.health) * 0.9; this.zones = [z, z * 0.6, z * 0.5, z * 0.5]; }
+  }
+
+  /** A hit on the player's car: v = impact speed (m/s), (wx, wz) = where it hit. */
+  private hurt(v: number, wx: number, wz: number, k = 1): void {
+    const p = this.player;
+    if (v < 6 || this.time - this.dmgT < 0.35 || this.stallT > 0 || p.ghostT > 0) return;
+    this.dmgT = this.time;
+    const amt = clamp((v - 5) / 110, 0.01, 0.3) * k * (1 - 0.6 * clamp(p.stats.armor, 0, 0.9)) * (this.race ? 0.6 : 1);
+    const dx = wx - p.x, dz = wz - p.z;
+    const f = dx * Math.sin(p.h) - dz * Math.cos(p.h), l = dx * Math.cos(p.h) + dz * Math.sin(p.h);
+    const zi = Math.abs(f) / p.dims.length >= Math.abs(l) / p.dims.width ? (f >= 0 ? 0 : 1) : (l < 0 ? 2 : 3);
+    this.zones[zi] = Math.min(1, this.zones[zi] + amt * 2.6);
+    this.health = Math.max(0, this.health - amt);
+    p.dmg = 1 - this.health;
+    this.events.push({ t: 'damage', amount: amt, health: this.health });
+    if (this.health <= 0) { this.stallT = 2.6; this.events.push({ t: 'wreck' }); }
+  }
+
+  /** Full repair (garage, service station, race start). */
+  repair(): void {
+    if (this.health >= 1 && this.zones.every((z) => z === 0)) return;
+    this.health = 1; this.zones = [0, 0, 0, 0]; this.player.dmg = 0; this.stallT = 0;
+    this.events.push({ t: 'damage', amount: 0, health: 1 });
   }
 
   get player(): CarState { return (this.drivers[0] as Driver).car; }
@@ -91,7 +124,7 @@ export class DriveSim {
     d.look = look;
     if (old.carId !== look.car || old.wheels !== look.wheels || stats) {
       const c = createCar(0, look.car, stats ?? old.stats, old.x, old.z, old.h, this.city, look.wheels);
-      c.vx = old.vx; c.vz = old.vz; c.nitro = Math.min(c.stats.nitroCap, old.nitro);
+      c.vx = old.vx; c.vz = old.vz; c.nitro = Math.min(c.stats.nitroCap, old.nitro); c.dmg = old.dmg;
       d.car = c;
     }
   }
@@ -156,6 +189,7 @@ export class DriveSim {
   /* --------------------------------------------------------------- races */
   startRace(def: RaceDef, ghost: number[] | null = null): void {
     this.endRace(false);
+    this.repair();
     const city = this.city;
     const halfW = (x: number, z: number): number => { const e = city.edges[city.edgeAt(x, z)]; return e ? e.width / 2 : 5.5; };
     const race = new RaceSession(def, halfW, this.gates, this.rand);
@@ -224,7 +258,18 @@ export class DriveSim {
 
     // ---- player input + reset + items
     let pin = input;
-    if (frozen) pin = { ...NO_INPUT, throttle: 0, brake: 1, steer: input.steer };
+    if (frozen) pin = { ...NO_INPUT, throttle: 0, brake: 1, reverse: 0, steer: input.steer };
+    if (this.stallT > 0) {
+      pin = { ...NO_INPUT, brake: 1, reverse: 0 };
+      this.stallT -= dt;
+      if (this.stallT <= 0) {
+        this.stallT = 0; this.health = 0.5; p.dmg = 0.5;
+        this.zones = this.zones.map((z) => z * 0.6) as [number, number, number, number];
+        if (race && race.state === 'running') this.resetPlayer();
+        p.ghostT = 2;
+        this.events.push({ t: 'damage', amount: 0, health: this.health });
+      }
+    }
     if (input.reset && !this.prevReset) this.resetPlayer();
     this.prevReset = input.reset;
     if (input.useItem && !pl.prevUse && pl.items.length > 0 && !frozen) this.useItem(pl);
@@ -236,7 +281,7 @@ export class DriveSim {
       let inp: DriveInput;
       if (d.kind === 'player') inp = pin;
       else if (d.kind === 'rival' && d.racer) {
-        if (frozen) inp = { ...NO_INPUT, brake: 1 };
+        if (frozen) inp = { ...NO_INPUT, brake: 1, reverse: 0 };
         else {
           inp = racerInput(d.racer, d.car, this.carsNear(d.car, 40), this.rubber(i), this.rand);
           // items: drop when someone is right behind, or now and then
@@ -255,6 +300,7 @@ export class DriveSim {
       stepCar(c, inp, this.city, far ? dt * 2 : dt, this.rand);
       const imp = collideStatic(c, this.city.statics);
       if (imp > 3 && d.kind !== 'traffic') this.events.push({ t: 'crash', x: c.impactX, z: c.impactZ, v: imp, driver: i });
+      if (d.kind === 'player') this.hurt(imp, c.impactX, c.impactZ);
       if (c.landImpact > 2 && d.kind === 'player') this.events.push({ t: 'land', driver: i, v: c.landImpact });
       if (c.turboOut > 0) this.events.push({ t: 'turbo', driver: i, tier: c.turboOut });
       // water / out of the world: reset
@@ -277,6 +323,7 @@ export class DriveSim {
         const v = collideCars(a, b, i === 0 && (this.drivers[j] as Driver).kind === 'rival' ? 2.2 : 1);
         if (v > 3 && (i === 0 || (this.drivers[j] as Driver).kind === 'rival')) this.events.push({ t: 'crash', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, v, driver: i });
         if (v > 4 && i === 0 && race && race.def.kind === 'delivery') this.parcelHit(v);
+        if (i === 0) this.hurt(v, (a.x + b.x) / 2, (a.z + b.z) / 2, 0.8);
       }
     }
 
@@ -623,7 +670,7 @@ export class DriveSim {
     return {
       speedKmh: Math.round(p.speed * 3.6), nitro: p.nitro, nitroCap: p.stats.nitroCap, items: this.playerDriver.items.slice(), coins: this.coins,
       race: r, heading: p.h, x: p.x, z: p.z, nearPoi, wrongWay: !!race && (race.cars[0]?.wrongT ?? 0) > 1,
-      drift: p.drifting ? Math.min(3, p.driftT / 0.8 * 1) : 0, combo: this.combo, driftTier: p.driftTier, boosting: p.boosting, draft: p.draft,
+      drift: p.drifting ? Math.min(3, p.driftT / 0.8 * 1) : 0, combo: this.combo, driftTier: p.driftTier, boosting: p.boosting, draft: p.draft, health: this.health,
     };
   }
 
