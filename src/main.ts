@@ -50,3 +50,6 @@ if (dev) {
 }
 
 (window as unknown as { __pr: unknown }).__pr = { ctx, bus, flow, drive, build: __BUILD__ };
+// the page loaded: drop the loading note and allow one automatic refresh again next time
+document.getElementById('bootmsg')?.remove();
+try { sessionStorage.removeItem('pr.reloaded'); } catch { /* storage may be blocked */ }
