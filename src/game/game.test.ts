@@ -71,3 +71,25 @@ describe('quiz gates', () => {
     }
   });
 });
+
+describe('car stats reach the engine', () => {
+  it('a new car or an upgrade changes the stats the sim drives with', async () => {
+    const { DriveSim } = await import('../drive/sim/world');
+    const { buildCity } = await import('../world3d/city');
+    const { emptySave } = await import('../core/save');
+    const { statsFor, CARS } = await import('./progress');
+    const s = emptySave();
+    const city = buildCity(11);
+    const sim = new DriveSim(city, { seed: 1, look: { ...s.look }, stats: statsFor(s), spawn: city.spawn, gates: [], traffic: 0 });
+    const before = sim.player.stats.topSpeed;
+    s.look.car = 'hyper';
+    sim.setLook({ ...s.look }, statsFor(s));
+    expect(sim.player.carId).toBe('hyper');
+    expect(sim.player.stats.topSpeed).toBeGreaterThan(before + 15);
+    s.upgrades.engine = 2;
+    sim.setLook({ ...s.look }, statsFor(s));
+    expect(sim.player.stats.topSpeed).toBe(60 + 6);
+    expect(new Set(CARS.map((c) => c.id)).size).toBe(15);
+    for (let k = 1; k < CARS.length; k++) expect(CARS[k]!.price).toBeGreaterThan(CARS[k - 1]!.price);
+  });
+});

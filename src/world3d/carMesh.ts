@@ -156,7 +156,7 @@ function proceduralCar(id: CarId): CarTemplate {
   const d = CAR_DIMS[id];
   const L = d.length, W = d.width;
   // side profile (z forward = -Z): [z, y] points, counter-clockwise
-  const prof: Record<CarId, { body: [number, number][]; cab: [number, number][] }> = {
+  const prof: Partial<Record<CarId, { body: [number, number][]; cab: [number, number][] }>> = {
     van: { body: [[-L / 2, 0.35], [L / 2, 0.35], [L / 2, 1.0], [L / 2 - 0.2, 1.15], [-L / 2 + 0.9, 1.15], [-L / 2 + 0.1, 0.95], [-L / 2, 0.6]], cab: [[L / 2 - 0.1, 1.1], [L / 2 - 0.15, 2.0], [-L / 2 + 1.5, 2.0], [-L / 2 + 0.95, 1.12]] },
     hatch: { body: [[-L / 2, 0.32], [L / 2, 0.32], [L / 2, 0.9], [L / 2 - 0.25, 1.0], [-L / 2 + 0.7, 0.95], [-L / 2, 0.7]], cab: [[L / 2 - 0.2, 0.95], [L / 2 - 0.45, 1.5], [-L / 2 + 1.6, 1.5], [-L / 2 + 0.85, 0.95]] },
     sport: { body: [[-L / 2, 0.3], [L / 2, 0.3], [L / 2, 0.8], [L / 2 - 0.3, 0.85], [-L / 2 + 0.4, 0.75], [-L / 2, 0.5]], cab: [[L / 2 - 0.5, 0.82], [L / 2 - 1.1, 1.25], [-L / 2 + 1.9, 1.25], [-L / 2 + 0.95, 0.8]] },
@@ -170,7 +170,7 @@ function proceduralCar(id: CarId): CarTemplate {
     g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -(width - bevel * 2) / 2, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
     return normalize(g, new THREE.Matrix4(), color, false);
   };
-  const p = prof[id];
+  const p = prof[id] ?? (d.height > 1.5 ? prof.jeep : prof.sport) as { body: [number, number][]; cab: [number, number][] };
   const paint = ext(p.body, W, null, 0.1);
   const cab = ext(p.cab, W - 0.16, new THREE.Color('#1f2b3b'), 0.06);
   const lights: THREE.BufferGeometry[] = [];

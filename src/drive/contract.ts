@@ -3,7 +3,8 @@
  * main session) and the data in content/he. Keep small and stable; add optional fields, do not break existing ones.
  * Units: meters, seconds, radians. Three.js axes: x east, y up, z south. Heading 0 = facing -z (north), positive = clockwise from above.
  */
-export type CarId = 'van' | 'hatch' | 'sport' | 'jeep' | 'super';
+export type CarId = 'van' | 'hatch' | 'sport' | 'jeep' | 'super'
+  | 'mini' | 'pickup' | 'muscle' | 'rally' | 'suv' | 'roadster' | 'gt' | 'electric' | 'concept' | 'hyper';
 export type WheelId = 'std' | 'sport' | 'offroad';
 export type VinylId = 'stripes' | 'flames' | 'stars' | 'checker' | 'net';
 export type ItemId = 'oil' | 'cones' | 'glue' | 'boostpad' | 'mine' | 'smoke';

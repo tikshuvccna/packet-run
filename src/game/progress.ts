@@ -27,9 +27,19 @@ export interface CarDef { id: CarId; he: string; price: number; base: Omit<CarSt
 export const CARS: CarDef[] = [
   { id: 'van', he: 'טנדר דינה', price: 0, base: { topSpeed: 40, accel: 13, grip: 1.0, handling: 1.0, mass: 1800 }, blurb: 'ישן וידידותי. מתחילים כאן.' },
   { id: 'hatch', he: 'חרק', price: 180, base: { topSpeed: 42, accel: 15, grip: 1.1, handling: 1.12, mass: 1100 }, blurb: 'קטן, זריז, מסתובב בכל פינה.' },
+  { id: 'mini', he: 'זיק', price: 260, base: { topSpeed: 44, accel: 16, grip: 1.15, handling: 1.25, mass: 950 }, blurb: 'כיס קטן, מנוע גדול. הכי קל בעיר.' },
+  { id: 'pickup', he: 'סלע', price: 380, base: { topSpeed: 43, accel: 14.5, grip: 1.2, handling: 0.95, mass: 2100 }, blurb: 'טנדר כבד. מי שנתקל בו זז הצידה.' },
   { id: 'sport', he: 'סופר-גל', price: 450, base: { topSpeed: 48, accel: 17, grip: 1.15, handling: 1.15, mass: 1300 }, blurb: 'נמוך ומהיר. אוהב עקומות.' },
+  { id: 'muscle', he: 'רעם', price: 550, base: { topSpeed: 50, accel: 18, grip: 1.0, handling: 1.0, mass: 1600 }, blurb: 'מכונית שרירים. כוח רב, אחיזה חלקה.' },
+  { id: 'rally', he: 'אבק', price: 600, base: { topSpeed: 47, accel: 17.5, grip: 1.3, handling: 1.2, mass: 1250 }, blurb: 'מכונית ראלי. נצמדת לכל כביש.' },
   { id: 'jeep', he: 'שועל', price: 650, base: { topSpeed: 43, accel: 14, grip: 1.25, handling: 0.95, mass: 2000 }, blurb: 'גבוה וחזק. לא מפחד מכלום.' },
-  { id: 'super', he: 'ברק', price: 1300, base: { topSpeed: 54, accel: 19, grip: 1.2, handling: 1.2, mass: 1400 }, blurb: 'הכי מהיר בעיר.' },
+  { id: 'suv', he: 'נמר', price: 700, base: { topSpeed: 46, accel: 15.5, grip: 1.2, handling: 1.0, mass: 1900 }, blurb: 'ג׳יפ ספורט מודרני. גדול ומהיר.' },
+  { id: 'roadster', he: 'רוח', price: 800, base: { topSpeed: 50, accel: 17.5, grip: 1.2, handling: 1.25, mass: 1050 }, blurb: 'גג פתוח, שני מושבים, היגוי חד.' },
+  { id: 'gt', he: 'חץ', price: 950, base: { topSpeed: 52, accel: 17.5, grip: 1.2, handling: 1.12, mass: 1450 }, blurb: 'מכונית מסע מהירה. יציבה במהירות.' },
+  { id: 'electric', he: 'זרם', price: 1100, base: { topSpeed: 51, accel: 21, grip: 1.2, handling: 1.15, mass: 1700 }, blurb: 'חשמלית. הזינוק הכי חזק.' },
+  { id: 'super', he: 'ברק', price: 1300, base: { topSpeed: 54, accel: 19, grip: 1.2, handling: 1.2, mass: 1400 }, blurb: 'מכונית על. מהירה מאוד.' },
+  { id: 'concept', he: 'עתיד', price: 1700, base: { topSpeed: 56, accel: 19.5, grip: 1.25, handling: 1.2, mass: 1300 }, blurb: 'מכונית מהעתיד. קווי אור וחופת זכוכית.' },
+  { id: 'hyper', he: 'סופה', price: 2400, base: { topSpeed: 60, accel: 21, grip: 1.3, handling: 1.22, mass: 1350 }, blurb: 'הכי מהירה בעיר. 216 קמ״ש.' },
 ];
 export const WHEELS: { id: WheelId; he: string; price: number; grip: number; handling: number; top: number }[] = [
   { id: 'std', he: 'רגילים', price: 0, grip: 0, handling: 0, top: 0 },
@@ -118,7 +128,7 @@ export const PRIZES: Record<string, Record<Level, Prize>> = {
   lesson08: {
     easy: { id: 'p08e', he: 'צמיגים טובים', desc: 'אחיזה חזקה', upgrade: 'tires' },
     medium: { id: 'p08m', he: 'מדבקת רשת', desc: 'וינייל חדש, ו-60 מטבעות', vinyl: 'net', coins: 60 },
-    hard: { id: 'p08h', he: 'ברק (רכב חדש)', desc: 'הרכב הכי מהיר, בחינם', car: 'super' },
+    hard: { id: 'p08h', he: 'ברק (רכב חדש)', desc: 'מכונית על, בחינם', car: 'super' },
   },
 };
 

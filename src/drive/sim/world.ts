@@ -159,7 +159,7 @@ export class DriveSim {
       // one in four is a taxi, a patrol car or a motorcycle
       const roll = this.rand();
       const extra: CarLook['extra'] = roll < 0.11 ? 'taxi' : roll < 0.16 ? 'police' : roll < 0.28 ? 'moto' : undefined;
-      const carId = extra ? 'hatch' : this.rng.pick(['van', 'hatch', 'hatch', 'jeep', 'van'] as const);
+      const carId = extra ? 'hatch' : this.rng.pick(['van', 'hatch', 'hatch', 'jeep', 'van', 'mini', 'suv', 'pickup', 'electric'] as const);
       const st = baseStats(carId);
       st.topSpeed *= 0.6;
       if (extra === 'moto') st.mass = 320;

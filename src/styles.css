@@ -333,3 +333,7 @@ html, body { margin: 0; height: 100%; background: #04101c; color: var(--foam); f
 .cranestack { display: flex; justify-content: center; margin: 10px 0; min-height: 100px; }
 .cranestack .nestcore.dim { opacity: .5; }
 .sidecard .btn.ghost, .mlist .btn.ghost { color: #5a3a8c; border-color: #b999e6; background: rgba(255, 255, 255, .55); }
+/* garage rows: compact, so a long car list needs less scrolling */
+.grow { padding: 5px 8px; }
+.grow .gtext { background: none; padding: 1px 4px; font-size: 1rem; text-align: right; border-radius: 0; }
+.grow .gtext small { font-size: .82rem; }

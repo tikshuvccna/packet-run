@@ -315,6 +315,12 @@ export class Flow {
     void this.enterStep();
   }
 
+  /** Send the car as it is in the save (model, paint, and the stats of the car, wheels and upgrades) to the engine. */
+  syncCar(): void {
+    this.ctx.bus.emit('drive:set-look', { ...this.s.look });
+    this.ctx.bus.emit('drive:set-stats', statsFor(this.s));
+  }
+
   private earn(n: number): void {
     this.s.coins += Math.round(n);
     this.ctx.save.save();
@@ -362,7 +368,7 @@ export class Flow {
     } else if (e.kind === 'garage' || e.kind === 'shop') {
       this.ctx.bus.emit('drive:repair', undefined);
       await this.modal(() => openGarage(this.ctx, e.kind === 'garage' ? 'cars' : 'upgrades'));
-      this.ctx.bus.emit('drive:set-look', { ...this.s.look });
+      this.syncCar();
       const st = currentStep(this.s);
       if (st && st.t === 'visit' && st.poi === e.id) { this.stepDone(true); void this.enterStep(); }
     } else if (e.kind === 'race' && e.race) {
@@ -378,7 +384,7 @@ export class Flow {
     const wasDone = !!this.s.lessons[lessonId]?.done;
     await this.modal(async () => { await runLessonHub(this.ctx, lessonId); });
     if (!wasDone && this.s.lessons[lessonId]?.done) { this.driveSec = 0; this.warned = false; this.ctx.bus.emit('ui:clock', { fuel: 1 }); }
-    this.ctx.bus.emit('drive:set-look', { ...this.s.look });
+    this.syncCar();
     this.hud?.setCoins(this.s.coins);
     this.ctx.audio.mood('city');
     void this.enterStep();

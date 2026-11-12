@@ -58,7 +58,7 @@ export function openGarage(ctx: Ctx, startTab: Tab = 'cars'): Promise<void> {
       for (const c of CARS) {
         const owned = s.cars.includes(c.id);
         const row = h('div', `grow${s.look.car === c.id ? ' sel' : ''}`);
-        const t = h('div', 'gtext'); t.append(h('b', null, c.he), h('small', null, c.blurb));
+        const t = h('div', 'gtext'); t.append(h('b', null, `${c.he} · ${Math.round(c.base.topSpeed * 3.6)} קמ״ש`), h('small', null, c.blurb));
         row.appendChild(t);
         const b = btn(owned ? (s.look.car === c.id ? 'נבחר' : 'בחירה') : String(c.price), () => {
           if (owned) { s.look.car = c.id as CarId; apply(); ctx.audio.sfx('click'); draw(); }

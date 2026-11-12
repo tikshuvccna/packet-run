@@ -695,7 +695,473 @@ def car_super():
     place_wheels('sport', tx, yf, yr)
 
 
-CARS = dict(car_van=car_van, car_hatch=car_hatch, car_sport=car_sport, car_jeep=car_jeep, car_super=car_super)
+# ===================================================================== ten more cars (2026-11-12)
+def slab(b, bvh, x, z, front, size, mat, bevel=0.02, rz=0.0, lift=0.0):
+    """A small plate stuck on the nose (front) or the tail, following the surface. size = (width, height, depth)."""
+    loc, nor = on_surface(bvh, (x, 10 if front else -10, z), (0, -1 if front else 1, 0))
+    if loc is None:
+        print("SLAB MISS", x, z, front)
+        return
+    b.box(size, mat=mat, matrix=align_mtx(loc + nor * lift, nor) @ Matrix.Rotation(rz, 4, 'Z'), bevel=bevel)
+
+
+def top_strip(b, sh, x, ya, yb, w, mat, n=8, h=0.025, lift=0.004):
+    """A stripe or vent lying on the top surface from ya to yb at side offset x."""
+    for k in range(n):
+        y0, y1 = ya + (yb - ya) * k / n, ya + (yb - ya) * (k + 1) / n
+        z0, z1 = sh.z_at(y0, x), sh.z_at(y1, x)
+        ln = math.hypot(y1 - y0, z1 - z0)
+        b.box((w, ln + 0.01, h), loc=(x, (y0 + y1) / 2, (z0 + z1) / 2 + lift), mat=mat,
+              rot=(math.atan2(z1 - z0, y1 - y0), 0, 0))
+
+
+def flares(b, x, ya, r=0.47, mat='Trim', rad=0.06):
+    for s in (1, -1):
+        pts = [(s * x, ya + r * math.cos(math.pi * k / 8), WR + r * math.sin(math.pi * k / 8) * 0.95) for k in range(9)]
+        b.tube(pts, rad, mat, seg=6)
+
+
+def side_line(b, sh, ya, yb, z, mat, w=0.03, h=0.05, n=10):
+    """A thin strip along both flanks at height z (light strips, trim lines)."""
+    for s in (1, -1):
+        for k in range(n):
+            y0, y1 = ya + (yb - ya) * k / n, ya + (yb - ya) * (k + 1) / n
+            x = sh.x_at((y0 + y1) / 2, z)
+            b.box((w, abs(y1 - y0) + 0.01, h), loc=(s * (x + 0.004), (y0 + y1) / 2, z), mat=mat)
+
+
+def car_mini():
+    """Pocket rocket: short, upright, white roof, rally lamps."""
+    car_mats('#e5484d', '#f7f4ee')
+    yf, yr, tx = 1.18, -1.15, 0.73
+    sh = Shape([(-1.86, 0.7, 0.4, 0.84), (-1.8, 0.84, 0.3, 0.96), (-1.4, 0.88, 0.27, 1.0), (1.0, 0.88, 0.27, 0.96),
+                (1.6, 0.85, 0.29, 0.86), (1.82, 0.76, 0.34, 0.74), (1.88, 0.6, 0.42, 0.62)],
+               n=4.0, tb=0.1, axles=(yf, yr), arch=0.43, archclear=0.18)
+    cab = Shape([(-1.76, 0.66, 0.84, 1.36), (-1.68, 0.76, 0.84, 1.5), (-1.2, 0.79, 0.84, 1.54), (0.1, 0.79, 0.84, 1.54),
+                 (0.55, 0.77, 0.84, 1.36), (0.95, 0.74, 0.84, 1.0), (1.05, 0.68, 0.84, 0.9)], n=5.0, tb=0.16)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.38, sh))
+    body.loft(cab.rings(30), cabin_mat_fn((-1.6, 0.15), [(-0.45, -0.33)], sill=0.2, roofmat='Trim', corner=False,
+                                          sh=cab, rearpaint=True))
+    bvh = body.bvh()
+    decal(body, bvh, False, 0, 1.28, 0.52, 0.15, corner=0.45, topk=0.1)
+    for s in (1, -1):
+        lamp(body, bvh, s * 0.58, 0.72, True, 0.15, 'Light_head', ringw=0.03)
+        lamp(body, bvh, s * 0.26, 0.5, True, 0.09, 'Light_head', ring='Rubber', ringw=0.025)      # rally lamps
+        lamp(body, bvh, s * 0.66, 0.8, False, 0.09, 'Light_tail', sz=1.5, ring='Chrome', ringw=0.02)
+        top_strip(body, sh, s * 0.2, 1.75, 1.05, 0.14, 'Trim', n=6)                               # bonnet stripes
+    slab(body, bvh, 0, 0.62, True, (0.62, 0.12, 0.05), 'Rubber', bevel=0.03)
+    flares(body, 0.88, yf, 0.46, 'Rubber', 0.05)
+    flares(body, 0.88, yr, 0.46, 'Rubber', 0.05)
+    bumper(body, 1.86, 0.36, 1.5, mat='Trim', d=0.14, h=0.12)
+    bumper(body, -1.86, 0.36, 1.5, mat='Trim', d=0.14, h=0.12)
+    mirrors(body, bvh, 0.72, 0.98, cab, cap='Trim')
+    handles(body, sh, (0.05,), 0.88)
+    for x in (-0.09, 0.09):
+        exhaust(body, x, -1.84, 0.3, r=0.045)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.55, -1.65, 0.46, 0.88)
+    vinyl_top(V, cab, 0.0, -1.5, 0.5, off=0.02)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -1.66, 1.52, 1.34, 0.3, 0.1, tilt=-0.2, plates=False)
+    nitro_flame(B_, [(-0.09, -1.96, 0.3), (0.09, -1.96, 0.3)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_pickup():
+    """Sport pickup: big cab, open bed with a roll bar."""
+    car_mats('#3d7dd8', '#2b2d36')
+    yf, yr, tx = 1.6, -1.5, 0.84
+    sh = Shape([(-2.5, 0.9, 0.52, 1.08), (-2.44, 0.97, 0.46, 1.14), (0.9, 0.97, 0.46, 1.14), (1.7, 0.96, 0.46, 1.1),
+                (2.3, 0.94, 0.48, 1.02), (2.5, 0.84, 0.54, 0.92)], n=7.0, tb=0.04, axles=(yf, yr), arch=0.46, archclear=0.2)
+    cab = Shape([(-0.75, 0.84, 1.08, 1.5), (-0.62, 0.92, 1.08, 1.78), (0.35, 0.92, 1.08, 1.8), (0.75, 0.91, 1.08, 1.5),
+                 (1.0, 0.89, 1.08, 1.14)], n=7.0, tb=0.08)
+    body = B()
+    body.loft(sh.rings(30), body_mat_fn(0.5, sh))
+    body.loft(cab.rings(18), cabin_mat_fn((-0.7, 0.4), [(-0.12, 0.0)], sill=0.1, roofmat='Paint', sh=cab))
+    bvh = body.bvh()
+    # the bed: dark floor, rails, a roll bar with lamps
+    body.box((1.62, 1.62, 0.03), loc=(0, -1.6, 1.15), mat='Rubber')
+    for s in (1, -1):
+        body.box((0.12, 1.72, 0.16), loc=(s * 0.89, -1.6, 1.2), mat='Paint', bevel=0.03)
+    body.box((1.9, 0.12, 0.16), loc=(0, -2.42, 1.2), mat='Paint', bevel=0.03)
+    body.tube([(-0.84, -0.95, 1.2), (-0.8, -0.95, 1.86), (0.8, -0.95, 1.86), (0.84, -0.95, 1.2)], 0.05, 'Trim', seg=8)
+    body.tube([(-0.84, -1.5, 1.2), (-0.8, -0.98, 1.84)], 0.04, 'Trim', seg=6)
+    body.tube([(0.84, -1.5, 1.2), (0.8, -0.98, 1.84)], 0.04, 'Trim', seg=6)
+    for k in range(-1, 2):
+        body.cyl(0.085, 0.07, loc=(k * 0.42, -0.9, 1.95), rot=(math.radians(90), 0, 0), mat='Light_head', seg=10)
+    body.box((0.7, 0.5, 0.34), loc=(0.3, -1.7, 1.33), mat='Trim', bevel=0.04, rot=(0, 0, 0.15))     # crate in the bed
+    flares(body, 0.98, yf, 0.48, 'Trim', 0.065)
+    flares(body, 0.98, yr, 0.48, 'Trim', 0.065)
+    for k in range(4):
+        slab(body, bvh, 0, 0.9 - k * 0.07, True, (1.1, 0.04, 0.05), 'Rubber', bevel=0.01)
+    for s in (1, -1):
+        slab(body, bvh, s * 0.74, 0.86, True, (0.3, 0.2, 0.06), 'Light_head', bevel=0.03)
+        slab(body, bvh, s * 0.82, 0.92, False, (0.14, 0.34, 0.05), 'Light_tail', bevel=0.02)
+        body.box((0.2, 2.0, 0.06), loc=(s * 1.0, 0.0, 0.46), mat='Trim', bevel=0.02)             # side steps
+    body.box((2.04, 0.26, 0.22), loc=(0, 2.52, 0.52), mat='Trim', bevel=0.04)
+    body.box((2.04, 0.2, 0.2), loc=(0, -2.54, 0.52), mat='Chrome', bevel=0.04)
+    mirrors(body, bvh, 0.72, 1.24, sh, cap='Trim', arm='Trim')
+    handles(body, sh, (0.1,), 1.02)
+    exhaust(body, -0.62, -2.55, 0.42)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 2.2, -2.3, 0.58, 1.1)
+    vinyl_top(V, sh, 2.3, 1.1, 0.5)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.3, 1.26, 1.7, 0.28, 0.2, tilt=-0.1)
+    nitro_flame(B_, [(-0.62, -2.68, 0.42)])
+    place_wheels('offroad', tx, yf, yr)
+
+
+def car_muscle():
+    """Muscle car: long flat bonnet with a scoop, short fastback cabin, wide stripes."""
+    car_mats('#f08a2c', '#1e1f26')
+    yf, yr, tx = 1.52, -1.42, 0.82
+    sh = Shape([(-2.42, 0.86, 0.42, 0.9), (-2.36, 0.96, 0.3, 0.98), (-1.5, 0.99, 0.28, 1.0), (0.0, 0.97, 0.28, 0.94),
+                (1.6, 0.96, 0.28, 0.9), (2.3, 0.94, 0.3, 0.86), (2.42, 0.86, 0.36, 0.78)],
+               n=5.5, tb=0.06, axles=(yf, yr), arch=0.44, archclear=0.14)
+    cab = Shape([(-1.9, 0.6, 0.9, 0.96), (-1.2, 0.76, 0.9, 1.26), (-0.6, 0.8, 0.9, 1.36), (-0.1, 0.8, 0.9, 1.36),
+                 (0.35, 0.77, 0.9, 1.14), (0.7, 0.72, 0.88, 0.94)], n=4.0, tb=0.22)
+    body = B()
+    body.loft(sh.rings(46), body_mat_fn(0.36, sh))
+    body.loft(cab.rings(28), cabin_mat_fn((-0.75, 0.0), [], sill=0.12, roofmat='Paint', sh=cab))
+    bvh = body.bvh()
+    slab(body, bvh, 0, 0.66, True, (1.7, 0.22, 0.05), 'Rubber', bevel=0.03)                     # full-width grille
+    for s in (1, -1):
+        for dx in (0.5, 0.74):
+            lamp(body, bvh, s * dx, 0.66, True, 0.085, 'Light_head', ring='Chrome', ringw=0.018, dy=0.0)
+        for k in range(3):
+            slab(body, bvh, s * (0.42 + k * 0.2), 0.7, False, (0.16, 0.14, 0.05), 'Light_tail', bevel=0.02)
+        top_strip(body, sh, s * 0.17, 2.3, 0.75, 0.2, 'Trim', n=8)
+        body.tube([(s * 0.99, 0.6, 0.3), (s * 1.0, -0.8, 0.3)], 0.045, 'Chrome', seg=8)         # side pipes
+    # bonnet scoop
+    z = sh.z_at(1.3, 0)
+    body.box((0.5, 0.8, 0.14), loc=(0, 1.3, z + 0.05), mat='Trim', bevel=0.04, taper=(0.8, 0.9, -0.05))
+    body.box((0.4, 0.05, 0.08), loc=(0, 1.71, z + 0.06), mat='Rubber')
+    bumper(body, 2.44, 0.4, 1.86, mat='Chrome', d=0.14, h=0.12)
+    bumper(body, -2.44, 0.4, 1.86, mat='Chrome', d=0.14, h=0.12)
+    body.box((1.7, 0.3, 0.07), loc=(0, -2.3, 1.02), mat='Paint', bevel=0.02, rot=(0.25, 0, 0))    # ducktail
+    mirrors(body, bvh, 0.5, 0.98, cab, cap='Chrome', arm='Chrome')
+    handles(body, sh, (-0.3,), 0.86)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.3, -1.2, 0.44, 0.9)
+    vinyl_top(V, sh, 2.3, 0.8, 0.5)
+    vinyl_top(V, cab, -0.05, -0.75, 0.48, off=0.02)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.2, 1.0, 1.7, 0.3, 0.22)
+    nitro_flame(B_, [(-0.9, -0.95, 0.3), (0.9, -0.95, 0.3)])
+    place_wheels('std', tx, yf, yr)
+
+
+def car_rally():
+    """Rally hatch: wide arches, lamp pod, roof scoop, mud flaps, tall wing."""
+    car_mats('#2f6fe0', '#f4f4f4')
+    yf, yr, tx = 1.32, -1.3, 0.8
+    sh = Shape([(-2.08, 0.78, 0.4, 0.9), (-2.0, 0.9, 0.3, 1.0), (-1.5, 0.94, 0.28, 1.04), (1.0, 0.93, 0.28, 0.98),
+                (1.7, 0.9, 0.3, 0.86), (2.0, 0.82, 0.34, 0.72), (2.1, 0.66, 0.42, 0.6)],
+               n=3.8, tb=0.1, axles=(yf, yr), arch=0.44, archclear=0.18)
+    cab = Shape([(-1.92, 0.68, 0.88, 1.3), (-1.8, 0.76, 0.88, 1.48), (-1.3, 0.79, 0.88, 1.54), (-0.2, 0.79, 0.88, 1.54),
+                 (0.4, 0.77, 0.88, 1.36), (0.9, 0.74, 0.88, 1.02), (1.05, 0.68, 0.88, 0.92)], n=4.2, tb=0.2)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.38, sh))
+    fender_pods(body, 0.8, yf, 0.62, 0.22, 0.56, 0.32)
+    fender_pods(body, 0.8, yr, 0.64, 0.23, 0.58, 0.34)
+    body.loft(cab.rings(30), cabin_mat_fn((-1.7, 0.0), [(-0.6, -0.48)], sill=0.2, roofmat='Paint', corner=False,
+                                          sh=cab, rearpaint=True))
+    bvh = body.bvh()
+    decal(body, bvh, False, 0, 1.28, 0.5, 0.14, corner=0.45, topk=0.1)
+    for s in (1, -1):
+        slab(body, bvh, s * 0.6, 0.72, True, (0.4, 0.14, 0.06), 'Light_head', bevel=0.03, rz=s * 0.12)
+        slab(body, bvh, s * 0.66, 0.84, False, (0.3, 0.14, 0.05), 'Light_tail', bevel=0.02)
+        top_strip(body, sh, s * 0.34, 1.5, 1.05, 0.2, 'Rubber', n=3)                              # bonnet vents
+        for ya in (yf, yr):                                                                       # mud flaps
+            body.box((0.3, 0.03, 0.3), loc=(s * 0.8, ya - 0.5, 0.3), mat='Trim')
+    # lamp pod on the bonnet
+    z = sh.z_at(1.72, 0)
+    body.box((1.0, 0.1, 0.06), loc=(0, 1.74, z + 0.05), mat='Rubber', bevel=0.02)
+    for k in (-1.5, -0.5, 0.5, 1.5):
+        body.cyl(0.11, 0.1, loc=(k * 0.25, 1.8, z + 0.16), rot=(math.radians(90), 0, 0), mat='Rubber', seg=12)
+        body.cyl(0.09, 0.02, loc=(k * 0.25, 1.86, z + 0.16), rot=(math.radians(90), 0, 0), mat='Light_head', seg=12)
+    slab(body, bvh, 0, 0.5, True, (0.9, 0.16, 0.06), 'Rubber', bevel=0.04)
+    body.box((1.76, 0.26, 0.05), loc=(0, 2.02, 0.29), mat='Trim', bevel=0.015)
+    # roof scoop
+    z = cab.z_at(-0.3, 0)
+    body.box((0.36, 0.5, 0.12), loc=(0, -0.35, z + 0.04), mat='Trim', bevel=0.03, taper=(0.8, 0.9, -0.05))
+    body.box((0.28, 0.04, 0.07), loc=(0, -0.09, z + 0.05), mat='Rubber')
+    mirrors(body, bvh, 0.68, 1.0, cab, cap='Paint', arm='Trim')
+    handles(body, sh, (0.05,), 0.9)
+    exhaust(body, 0.5, -2.06, 0.32, r=0.06)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.75, -1.85, 0.46, 0.92)
+    vinyl_top(V, cab, 0.0, -1.6, 0.5, off=0.02)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -1.86, 1.34, 1.64, 0.36, 0.34, tilt=-0.18)
+    nitro_flame(B_, [(0.5, -2.2, 0.32)])
+    place_wheels('offroad', tx, yf, yr)
+
+
+def car_suv():
+    """Sport SUV: tall, sloping black roof, light bar at the back."""
+    car_mats('#e8eaf0', '#1b1c22')
+    yf, yr, tx = 1.45, -1.4, 0.82
+    sh = Shape([(-2.3, 0.86, 0.5, 1.08), (-2.24, 0.95, 0.42, 1.16), (-1.5, 0.98, 0.4, 1.18), (1.3, 0.97, 0.4, 1.12),
+                (1.95, 0.95, 0.42, 1.04), (2.24, 0.9, 0.46, 0.94), (2.33, 0.78, 0.54, 0.82)],
+               n=4.5, tb=0.08, axles=(yf, yr), arch=0.46, archclear=0.2)
+    cab = Shape([(-2.15, 0.7, 1.06, 1.36), (-1.8, 0.8, 1.06, 1.58), (-1.0, 0.84, 1.06, 1.7), (0.0, 0.84, 1.06, 1.7),
+                 (0.6, 0.82, 1.06, 1.5), (1.1, 0.79, 1.06, 1.16), (1.22, 0.74, 1.06, 1.08)], n=4.2, tb=0.18)
+    body = B()
+    body.loft(sh.rings(46), body_mat_fn(0.52, sh))
+    body.loft(cab.rings(30), cabin_mat_fn((-1.6, 0.15), [(-0.5, -0.4)], sill=0.12, roofmat='Trim', corner=False, sh=cab))
+    bvh = body.bvh()
+    slab(body, bvh, 0, 0.74, True, (1.0, 0.3, 0.05), 'Rubber', bevel=0.05)
+    for k in range(3):
+        slab(body, bvh, 0, 0.66 + k * 0.08, True, (0.9, 0.025, 0.07), 'Chrome', bevel=0.0)
+    slab(body, bvh, 0, 0.98, False, (1.6, 0.07, 0.05), 'Light_tail', bevel=0.02)                 # tail light bar
+    for s in (1, -1):
+        slab(body, bvh, s * 0.68, 0.92, True, (0.42, 0.09, 0.06), 'Light_head', bevel=0.03, rz=s * 0.1)
+        slab(body, bvh, s * 0.76, 0.98, False, (0.2, 0.16, 0.06), 'Light_tail', bevel=0.03)
+        body.tube([(s * 0.7, 0.1, 1.72), (s * 0.7, -1.3, 1.7)], 0.03, 'Chrome', seg=6)           # roof rails
+        body.box((0.14, 1.9, 0.06), loc=(s * 0.98, 0.02, 0.44), mat='Rubber', bevel=0.02)
+    flares(body, 0.98, yf, 0.48, 'Rubber', 0.055)
+    flares(body, 0.98, yr, 0.48, 'Rubber', 0.055)
+    body.box((1.96, 0.2, 0.18), loc=(0, 2.3, 0.5), mat='Rubber', bevel=0.04)
+    body.box((1.96, 0.2, 0.18), loc=(0, -2.28, 0.5), mat='Rubber', bevel=0.04)
+    body.box((1.0, 0.22, 0.05), loc=(0, 2.32, 0.42), mat='Chrome', bevel=0.015)
+    mirrors(body, bvh, 0.8, 1.2, cab, cap='Paint', arm='Trim')
+    handles(body, sh, (0.2, -0.75), 1.02)
+    for x in (-0.55, 0.55):
+        exhaust(body, x, -2.3, 0.44, r=0.055)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 2.0, -2.05, 0.56, 1.1)
+    vinyl_top(V, sh, 2.2, 1.25, 0.5)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -1.86, 1.6, 1.5, 0.3, 0.12, tilt=-0.2, plates=False)
+    nitro_flame(B_, [(-0.55, -2.42, 0.44), (0.55, -2.42, 0.44)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_roadster():
+    """Open two-seater: no roof, windscreen frame, two seats and roll hoops."""
+    car_mats('#1fb86a', '#c98a4b')
+    yf, yr, tx = 1.3, -1.22, 0.78
+    sh = Shape([(-2.0, 0.74, 0.36, 0.72), (-1.93, 0.88, 0.28, 0.82), (-1.4, 0.92, 0.26, 0.86), (-0.3, 0.9, 0.26, 0.84),
+                (0.9, 0.88, 0.26, 0.8), (1.6, 0.84, 0.26, 0.7), (1.94, 0.76, 0.28, 0.56), (2.02, 0.6, 0.32, 0.46)],
+               n=3.0, tb=0.12, axles=(yf, yr), arch=0.43, archclear=0.12)
+    scr = Shape([(0.1, 0.64, 0.78, 0.84), (0.26, 0.7, 0.78, 1.12), (0.36, 0.7, 0.78, 1.14), (0.8, 0.62, 0.74, 0.8)],
+                n=3.2, tb=0.25)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.34, sh))
+    fender_pods(body, 0.72, yf, 0.56, 0.22, 0.52, 0.28)
+    fender_pods(body, 0.74, yr, 0.6, 0.24, 0.56, 0.32)
+    body.loft(scr.rings(14), cabin_mat_fn((9, 9), [], sill=0.14, roofmat='Paint', sh=scr))
+    bvh = body.bvh()
+    # cockpit: dark tub, two seats, roll hoops, steering wheel
+    zc = sh.z_at(-0.4, 0)
+    body.box((1.2, 1.0, 0.05), loc=(0, -0.4, zc + 0.012), mat='Rubber', bevel=0.02)
+    for s in (1, -1):
+        body.box((0.44, 0.46, 0.14), loc=(s * 0.33, -0.35, zc + 0.08), mat='Trim', bevel=0.05)
+        body.box((0.42, 0.14, 0.5), loc=(s * 0.33, -0.66, zc + 0.3), mat='Trim', bevel=0.05, rot=(-0.2, 0, 0))
+        body.tube([(s * 0.52, -0.92, zc), (s * 0.5, -0.92, zc + 0.5), (s * 0.16, -0.92, zc + 0.5), (s * 0.14, -0.92, zc)],
+                  0.035, 'Chrome', seg=8)
+        lamp(body, bvh, s * 0.58, 0.56, True, 0.13, 'Light_head', ringw=0.03)
+        lamp(body, bvh, s * 0.6, 0.66, False, 0.085, 'Light_tail', ring='Chrome', ringw=0.02)
+    body.cyl(0.15, 0.03, loc=(0.33, -0.02, zc + 0.3), rot=(math.radians(65), 0, 0), mat='Rubber', seg=14)
+    slab(body, bvh, 0, 0.4, True, (0.7, 0.14, 0.06), 'Rubber', bevel=0.05)
+    slab(body, bvh, 0, 0.4, True, (0.74, 0.03, 0.08), 'Chrome', bevel=0.0)
+    bumper(body, -1.98, 0.34, 1.5, mat='Chrome', d=0.1, h=0.08)
+    mirrors(body, bvh, 0.42, 0.9, scr, cap='Chrome', arm='Chrome')
+    for x in (-0.3, 0.3):
+        exhaust(body, x, -1.98, 0.32, r=0.05)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.2, -1.0, 0.4, 0.78)
+    vinyl_top(V, sh, 1.85, 0.9, 0.42)
+    vinyl_top(V, sh, -1.05, -1.85, 0.42)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -1.78, 0.84, 1.4, 0.28, 0.16)
+    nitro_flame(B_, [(-0.3, -2.1, 0.32), (0.3, -2.1, 0.32)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_gt():
+    """Grand tourer: long bonnet, fastback tail, oval grille."""
+    car_mats('#c0c8d0', '#2b2d36')
+    yf, yr, tx = 1.5, -1.4, 0.82
+    sh = Shape([(-2.38, 0.8, 0.36, 0.8), (-2.3, 0.94, 0.28, 0.9), (-1.6, 0.99, 0.26, 0.94), (-0.5, 0.97, 0.26, 0.9),
+                (0.8, 0.95, 0.26, 0.84), (1.8, 0.93, 0.26, 0.76), (2.26, 0.86, 0.28, 0.62), (2.4, 0.7, 0.32, 0.5)],
+               n=3.4, tb=0.1, axles=(yf, yr), arch=0.43, archclear=0.12)
+    cab = Shape([(-2.1, 0.5, 0.84, 0.88), (-1.5, 0.68, 0.84, 1.1), (-0.9, 0.74, 0.84, 1.24), (-0.3, 0.75, 0.84, 1.28),
+                 (0.25, 0.72, 0.84, 1.12), (0.8, 0.64, 0.8, 0.86)], n=3.4, tb=0.3)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.34, sh))
+    fender_pods(body, 0.78, yr, 0.64, 0.25, 0.62, 0.36)
+    body.loft(cab.rings(30), cabin_mat_fn((-1.0, -0.1), [], sill=0.12, roofmat='Paint', sh=cab))
+    bvh = body.bvh()
+    loc, nor = on_surface(bvh, (0, 10, 0.5), (0, -1, 0))
+    if loc is not None:                                                                         # oval grille
+        m = align_mtx(loc + nor * 0.005, nor)
+        body.cyl(0.3, 0.05, mat='Chrome', matrix=m @ Matrix.Diagonal((1.5, 0.5, 1, 1)), seg=20)
+        body.cyl(0.27, 0.06, mat='Rubber', matrix=m @ Matrix.Diagonal((1.5, 0.48, 1, 1)), seg=20)
+    for s in (1, -1):
+        lamp(body, bvh, s * 0.68, 0.62, True, 0.12, 'Light_head', sx=1.0, sz=1.5, ringw=0.025)
+        slab(body, bvh, s * 0.62, 0.74, False, (0.46, 0.08, 0.05), 'Light_tail', bevel=0.03, rz=-s * 0.06)
+        x = sh.x_at(0.75, 0.6)
+        body.box((0.05, 0.36, 0.12), loc=(s * x, 0.75, 0.6), mat='Rubber', bevel=0.03)          # wing vents
+        body.box((0.06, 0.3, 0.02), loc=(s * (x + 0.01), 0.75, 0.6), mat='Chrome')
+        for dx in (0.5, 0.64):
+            exhaust(body, s * dx, -2.36, 0.33, r=0.045)
+        top_strip(body, sh, s * 0.4, 1.7, 1.3, 0.16, 'Rubber', n=3)
+    body.box((1.76, 0.26, 0.04), loc=(0, 2.28, 0.28), mat='Trim', bevel=0.015)
+    body.box((1.5, 0.3, 0.12), loc=(0, -2.3, 0.3), mat='Rubber', bevel=0.03)
+    body.box((1.5, 0.24, 0.06), loc=(0, -2.26, 0.96), mat='Paint', bevel=0.02, rot=(0.3, 0, 0))    # ducktail
+    mirrors(body, bvh, 0.42, 0.92, cab, cap='Paint', arm='Trim')
+    handles(body, sh, (-0.2,), 0.8)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.2, -1.1, 0.42, 0.84)
+    vinyl_top(V, sh, 2.15, 0.9, 0.44)
+    vinyl_top(V, cab, -0.15, -0.95, 0.44, off=0.02)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.1, 0.94, 1.6, 0.3, 0.2)
+    nitro_flame(B_, [(-0.57, -2.48, 0.33), (0.57, -2.48, 0.33)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_electric():
+    """Electric coupe: one smooth bow, glass roof, light bars front and rear, glowing sills, no grille, no exhaust."""
+    car_mats('#2dc4e8', '#1b1c22', glass='#1a2a44')
+    yf, yr, tx = 1.48, -1.45, 0.83
+    sh = Shape([(-2.38, 0.84, 0.34, 0.84), (-2.3, 0.95, 0.27, 0.94), (-1.6, 0.98, 0.25, 0.98), (0.4, 0.97, 0.25, 0.9),
+                (1.5, 0.95, 0.25, 0.8), (2.2, 0.9, 0.26, 0.64), (2.4, 0.74, 0.3, 0.5)],
+               n=3.6, tb=0.1, axles=(yf, yr), arch=0.43, archclear=0.12)
+    cab = Shape([(-2.0, 0.56, 0.9, 0.96), (-1.4, 0.72, 0.9, 1.2), (-0.6, 0.78, 0.9, 1.36), (0.1, 0.78, 0.9, 1.38),
+                 (0.7, 0.74, 0.86, 1.14), (1.3, 0.66, 0.8, 0.86)], n=3.6, tb=0.28)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.33, sh))
+    body.loft(cab.rings(30), cabin_mat_fn((9, 9), [(-0.36, -0.28)], sill=0.1, roofmat='Glass', corner=False, sh=cab))
+    bvh = body.bvh()
+    slab(body, bvh, 0, 0.6, True, (1.5, 0.045, 0.05), 'Light_head', bevel=0.015)                # front light bar
+    slab(body, bvh, 0, 0.8, False, (1.66, 0.05, 0.05), 'Light_tail', bevel=0.015)               # rear light bar
+    for s in (1, -1):
+        slab(body, bvh, s * 0.7, 0.52, True, (0.3, 0.1, 0.05), 'Light_head', bevel=0.03, rz=s * 0.25)
+        slab(body, bvh, s * 0.6, 0.36, True, (0.36, 0.1, 0.05), 'Rubber', bevel=0.03)
+        x = sh.x_at(-1.0, 0.7)
+        body.cyl(0.07, 0.02, loc=(s * x, -1.0, 0.72), rot=(0, math.radians(90), 0), mat='Emissive' if s > 0 else 'Paint',
+                 seg=12)                                                                        # charge port
+    side_line(body, sh, 1.0, -1.0, 0.3, 'Emissive', w=0.03, h=0.045)                            # glowing sills
+    body.box((1.6, 0.3, 0.1), loc=(0, -2.28, 0.3), mat='Rubber', bevel=0.03)
+    body.box((1.7, 0.22, 0.04), loc=(0, 2.3, 0.27), mat='Trim', bevel=0.015)
+    mirrors(body, bvh, 0.72, 0.98, cab, cap='Paint', arm='Trim')
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.2, -1.2, 0.42, 0.86)
+    vinyl_top(V, sh, 2.2, 1.35, 0.44)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.16, 0.98, 1.5, 0.26, 0.1, tilt=-0.2, plates=False)
+    nitro_flame(B_, [(-0.4, -2.44, 0.4), (0.4, -2.44, 0.4)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_concept():
+    """Concept car: sharp wedge, glass canopy, glowing lines, twin fins."""
+    car_mats('#f4f6fa', '#16171c', glass='#18304a')
+    yf, yr, tx = 1.5, -1.45, 0.86
+    sh = Shape([(-2.34, 0.9, 0.32, 0.9), (-2.26, 1.02, 0.24, 0.96), (-1.6, 1.05, 0.22, 0.94), (-0.4, 1.0, 0.22, 0.8),
+                (0.8, 0.98, 0.22, 0.64), (1.8, 0.96, 0.22, 0.48), (2.28, 0.9, 0.22, 0.34), (2.38, 0.8, 0.24, 0.28)],
+               n=6.0, tb=0.16, axles=(yf, yr), arch=0.43, archclear=0.08)
+    cab = Shape([(-1.5, 0.4, 0.74, 0.8), (-0.9, 0.6, 0.74, 1.02), (-0.3, 0.64, 0.7, 1.1), (0.3, 0.6, 0.66, 1.0),
+                 (1.0, 0.44, 0.56, 0.66)], n=2.4, tb=0.3)
+    body = B()
+    body.loft(sh.rings(50), body_mat_fn(0.3, sh))
+    fender_pods(body, 0.82, yf, 0.5, 0.2, 0.6, 0.27)
+    fender_pods(body, 0.84, yr, 0.56, 0.22, 0.6, 0.3)
+    body.loft(cab.rings(30), cabin_mat_fn((9, 9), [], sill=0.08, roofmat='Glass', corner=False, sh=cab))
+    bvh = body.bvh()
+    slab(body, bvh, 0, 0.29, True, (1.7, 0.035, 0.05), 'Light_head', bevel=0.01)                # light blade
+    slab(body, bvh, 0, 0.84, False, (1.9, 0.04, 0.05), 'Light_tail', bevel=0.01)
+    slab(body, bvh, 0, 0.6, False, (1.5, 0.2, 0.05), 'Rubber', bevel=0.03)
+    side_line(body, sh, 1.9, -2.1, 0.42, 'Emissive', w=0.03, h=0.035, n=14)
+    for s in (1, -1):
+        top_strip(body, sh, s * 0.3, 2.1, 1.0, 0.035, 'Emissive', n=6, h=0.02)
+        body.box((0.05, 0.9, 0.34), loc=(s * 0.86, -1.86, 1.06), mat='Trim', bevel=0.02, taper=(1.0, 0.45, -0.22))  # fins
+        body.box((0.03, 0.5, 0.03), loc=(s * 0.86, -1.9, 1.24), mat='Emissive')
+        x = sh.x_at(-0.9, 0.5)
+        body.box((0.06, 0.6, 0.2), loc=(s * x, -0.9, 0.5), mat='Rubber', bevel=0.04, taper=(1, 0.5, -0.12))
+        # wheel covers (aero discs) are part of the look: thin dark arcs over the arches
+        body.box((0.16, 0.1, 0.05), loc=(s * 0.98, 0.72, 0.5), mat='Trim', bevel=0.02)             # camera pods
+    body.box((1.8, 0.4, 0.12), loc=(0, -2.22, 0.3), mat='Trim', bevel=0.03)
+    for k in range(-3, 4):
+        body.box((0.03, 0.36, 0.14), loc=(k * 0.24, -2.24, 0.3), mat='Rubber')
+    body.box((1.9, 0.3, 0.035), loc=(0, 2.26, 0.235), mat='Trim', bevel=0.012)
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.1, -0.5, 0.46, 0.7)
+    vinyl_top(V, sh, 2.15, 1.15, 0.4)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.0, 1.2, 1.76, 0.3, 0.06, tilt=-0.1, plates=False)
+    nitro_flame(B_, [(-0.3, -2.44, 0.42), (0.3, -2.44, 0.42)])
+    place_wheels('sport', tx, yf, yr)
+
+
+def car_hyper():
+    """Hypercar: very low and wide, teardrop cabin, shark fin, triple exhaust, huge diffuser."""
+    car_mats('#ff3b6b', '#1a1b21')
+    yf, yr, tx = 1.55, -1.5, 0.88
+    sh = Shape([(-2.44, 0.9, 0.32, 0.8), (-2.36, 1.04, 0.24, 0.9), (-1.75, 1.08, 0.22, 0.92), (-0.7, 1.0, 0.22, 0.74),
+                (0.5, 0.96, 0.22, 0.6), (1.6, 0.99, 0.22, 0.58), (2.28, 0.93, 0.22, 0.42), (2.45, 0.76, 0.24, 0.3)],
+               n=2.7, tb=0.1, axles=(yf, yr), arch=0.43, archclear=0.08)
+    cab = Shape([(-1.9, 0.36, 0.66, 0.72), (-1.2, 0.6, 0.66, 0.98), (-0.4, 0.7, 0.66, 1.06), (0.2, 0.7, 0.66, 1.04),
+                 (0.7, 0.62, 0.64, 0.86), (1.1, 0.5, 0.6, 0.66)], n=2.8, tb=0.4)
+    body = B()
+    body.loft(sh.rings(52), body_mat_fn(0.3, sh))
+    fender_pods(body, 0.82, yf, 0.5, 0.22, 0.56, 0.3)
+    fender_pods(body, 0.86, yr, 0.52, 0.28, 0.74, 0.44)
+    body.loft(cab.rings(30), cabin_mat_fn((-0.9, -0.1), [], sill=0.1, roofmat='Trim', sh=cab))
+    bvh = body.bvh()
+    for s in (1, -1):
+        for k in range(3):                                                                      # triple light slivers
+            slab(body, bvh, s * (0.5 + k * 0.13), 0.38 + k * 0.035, True, (0.11, 0.05, 0.05), 'Light_head', bevel=0.015)
+        slab(body, bvh, s * 0.66, 0.7, False, (0.5, 0.045, 0.05), 'Light_tail', bevel=0.015, rz=-s * 0.12)
+        x = sh.x_at(-0.8, 0.46)
+        body.box((0.07, 0.8, 0.26), loc=(s * x, -0.8, 0.46), mat='Rubber', bevel=0.04, taper=(1, 0.5, -0.16))
+        body.box((0.5, 0.12, 0.04), loc=(s * 0.74, 2.36, 0.36), mat='Trim', rot=(0, 0, s * 0.2))      # canards
+        body.box((0.5, 0.1, 0.04), loc=(s * 0.76, 2.3, 0.46), mat='Trim', rot=(0, 0, s * 0.24))
+        top_strip(body, sh, s * 0.34, 1.9, 1.3, 0.22, 'Rubber', n=4)                              # bonnet outlets
+    side_line(body, sh, 0.9, -0.3, 0.34, 'Emissive', w=0.025, h=0.03, n=6)
+    slab(body, bvh, 0, 0.3, True, (1.2, 0.09, 0.07), 'Rubber', bevel=0.03)
+    body.box((2.0, 0.36, 0.035), loc=(0, 2.3, 0.235), mat='Trim', bevel=0.012)                    # splitter
+    body.box((1.8, 0.46, 0.16), loc=(0, -2.32, 0.3), mat='Trim', bevel=0.03)                      # diffuser
+    for k in range(-3, 4):
+        body.box((0.03, 0.42, 0.2), loc=(k * 0.26, -2.34, 0.3), mat='Rubber')
+    # shark fin from the roof to the tail, engine slats
+    zr = cab.z_at(-0.6, 0)
+    body.box((0.05, 1.5, 0.3), loc=(0, -1.35, zr - 0.02), mat='Trim', bevel=0.015, taper=(1.0, 0.5, -0.36))
+    for k in range(4):
+        y = -1.25 - k * 0.2
+        for s in (1, -1):
+            body.box((0.44, 0.08, 0.04), loc=(s * 0.34, y, sh.z_at(y, 0.34)), mat='Rubber', bevel=0.012)
+    for x in (-0.14, 0, 0.14):
+        exhaust(body, x, -2.4, 0.5 if x == 0 else 0.42, r=0.055)
+    mirrors(body, bvh, 0.6, 0.74, cab, cap='Trim', arm='Trim')
+    B_ = body.obj('Body')
+    V = B()
+    vinyl_side(V, sh, 1.0, -0.3, 0.38, 0.66)
+    vinyl_top(V, sh, 2.2, 1.1, 0.4)
+    V.obj('Vinyl', parent=B_)
+    wing(B_, -2.16, 0.84, 2.0, 0.46, 0.4, tilt=-0.16)
+    nitro_flame(B_, [(-0.14, -2.52, 0.42), (0, -2.52, 0.5), (0.14, -2.52, 0.42)])
+    place_wheels('sport', tx, yf, yr)
+
+
+CARS = dict(car_van=car_van, car_hatch=car_hatch, car_sport=car_sport, car_jeep=car_jeep, car_super=car_super,
+            car_mini=car_mini, car_pickup=car_pickup, car_muscle=car_muscle, car_rally=car_rally, car_suv=car_suv,
+            car_roadster=car_roadster, car_gt=car_gt, car_electric=car_electric, car_concept=car_concept,
+            car_hyper=car_hyper)
 
 
 def preview_car(name):

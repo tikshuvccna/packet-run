@@ -230,6 +230,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     bus.on('drive:teleport', (t) => { sim?.endRace(); sim?.teleport(t.x, t.z, t.heading); if (sim) scene?.chase.snap(sim.player); }),
     bus.on('drive:start-race', (def) => startRace(def)),
     bus.on('drive:set-look', (look) => { if (!sim || !scene) return; sim.setLook(look); scene.setPlayerLook(sim); }),
+    bus.on('drive:set-stats', (stats) => { if (!sim || !scene) return; sim.setLook(sim.playerDriver.look, stats); scene.setPlayerLook(sim); }),
     bus.on('drive:marker', (m) => { marker = m; scene?.setMarker(m); }),
     bus.on('drive:side-spots', (l) => { sideSpots = l; scene?.setSideSpots(l); }),
     bus.on('drive:repair', () => sim?.repair()),

@@ -1,5 +1,5 @@
 /** Tiny typed event bus between the 3D drive scene and the DOM UI. */
-import type { CarLook, DriveConfig, DriveInput, HudState, ItemId, RaceDef, RaceResult } from '../drive/contract';
+import type { CarLook, CarStats, DriveConfig, DriveInput, HudState, ItemId, RaceDef, RaceResult } from '../drive/contract';
 
 export interface GameEvents {
   /** Drive -> UI */
@@ -25,6 +25,8 @@ export interface GameEvents {
   'drive:teleport': { x: number; z: number; heading: number };
   'drive:start-race': RaceDef;
   'drive:set-look': CarLook;
+  /** the player's car stats changed (another car, an upgrade, new wheels) */
+  'drive:set-stats': CarStats;
   'ui:pause': { paused: boolean };
   'ui:input': DriveInput;
   'ui:clock': { fuel: number };
