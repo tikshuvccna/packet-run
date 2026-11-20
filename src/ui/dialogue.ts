@@ -1,6 +1,7 @@
 import { SPEAKERS, line } from '../content';
 import { clear, h, overlay } from './dom';
 import { type Ctx, portraitImg } from './ctx';
+import { playVoice, stopVoice } from '../audio/voice';
 
 /** Plays a list of line ids as a short dialogue; click or tap to advance. Resolves when the last line is dismissed. */
 export function say(ctx: Ctx, ids: string[], opts: { mood?: Record<string, string> } = {}): Promise<void> {
@@ -21,7 +22,7 @@ export function say(ctx: Ctx, ids: string[], opts: { mood?: Record<string, strin
 
     const show = (): void => {
       const id = ids[i];
-      if (!id) { close(); resolve(); return; }
+      if (!id) { stopVoice(); close(); resolve(); return; }
       const l = line(id);
       full = l.text.replace(/\{name\}/g, name);
       clear(por);
@@ -37,6 +38,7 @@ export function say(ctx: Ctx, ids: string[], opts: { mood?: Record<string, strin
         if (n >= full.length) { clearInterval(typing); typing = 0; }
       }, 22);
       ctx.audio.sfx('talk');
+      playVoice(id);
     };
     const advance = (): void => {
       if (typing) { clearInterval(typing); typing = 0; txt.textContent = full; return; }
