@@ -84,7 +84,9 @@ function runTower(ctx: Ctx, lessonId: string, data: GameData, level: Level): Pro
     let points = 0;
     let handled = 0;
     let stopped = false;
-    const sh = shell(data.title, level, cfg.lives, ctx, () => { stopped = true; sh.close(); resolve({ passed: false, points, max: items.length, prize: null }); });
+    let raf = 0;
+    const onKey = (e: KeyboardEvent): void => { if (layers.includes(e.key)) answer(e.key); };
+    const sh = shell(data.title, level, cfg.lives, ctx, () => { stopped = true; cancelAnimationFrame(raf); window.removeEventListener('keydown', onKey); sh.close(); resolve({ passed: false, points, max: items.length, prize: null }); });
     sh.setHearts(lives);
     sh.setProgress(0, items.length, 0);
     const field = h('div', 'tower');
@@ -120,10 +122,8 @@ function runTower(ctx: Ctx, lessonId: string, data: GameData, level: Level): Pro
       if (!l || stopped) return;
       resolveItem(l, l.it.layer === layer, layer);
     }
-    const onKey = (e: KeyboardEvent): void => { if (layers.includes(e.key)) answer(e.key); };
     window.addEventListener('keydown', onKey);
 
-    let raf = 0;
     const tick = async (): Promise<void> => {
       if (stopped) return;
       const now = performance.now() - t0;

@@ -177,7 +177,7 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
       if (p.skid > 0.5 && prevSkid <= 0.5) bus.emit('audio:sfx', { name: 'skid', vol: p.skid });
       prevSkid = p.skid;
     }
-    if (posT >= 1) { posT = 0; bus.emit('drive:position', { x: p.x, z: p.z, heading: p.h }); }
+    if (posT >= 1) { posT = 0; bus.emit('drive:position', { x: p.x, z: p.z, heading: p.h }); bus.emit('drive:fps', Math.round(fpsS)); }
   }
 
   function drainEvents(s: DriveSim, sc: Scene3D): void {
@@ -231,6 +231,8 @@ export function createDrive(container: HTMLElement, bus: Bus): DriveHandle {
     bus.on('drive:start-race', (def) => startRace(def)),
     bus.on('drive:set-look', (look) => { if (!sim || !scene) return; sim.setLook(look); scene.setPlayerLook(sim); }),
     bus.on('drive:set-stats', (stats) => { if (!sim || !scene) return; sim.setLook(sim.playerDriver.look, stats); scene.setPlayerLook(sim); }),
+    bus.on('drive:set-cleaned', (c) => scene?.setCleaned(c)),
+    bus.on('drive:camera', (m) => { if (scene) scene.chase.mode = m; }),
     bus.on('drive:marker', (m) => { marker = m; scene?.setMarker(m); }),
     bus.on('drive:side-spots', (l) => { sideSpots = l; scene?.setSideSpots(l); }),
     bus.on('drive:repair', () => sim?.repair()),

@@ -1,6 +1,9 @@
 import type { Look } from '../core/save';
+import { LESSON_IDS, LESSONS } from '../content';
+import { CARS, totalUpgrades } from '../game/progress';
 import { btn, clear, h, overlay } from './dom';
 import type { Ctx } from './ctx';
+import { fmtTime } from './hud';
 
 export const CREDITS_TEXT = {
   line1: 'משחק זה פותח ונבנה על ידי מיכאל תקשוב מאתר מגמת תקשוב.',
@@ -110,7 +113,6 @@ export function openSettings(ctx: Ctx, onReset?: () => void): Promise<void> {
     q.addEventListener('change', () => { st.quality = q.value as typeof st.quality; ctx.save.save(); });
     row('איכות גרפית', q);
     row('מונה FPS', toggle(() => st.showFps, (v) => { st.showFps = v; }));
-    row('שני שחקנים על מכשיר אחד', toggle(() => ctx.save.data.twoPlayers, (v) => { ctx.save.data.twoPlayers = v; }));
     if (onReset) {
       const r = btn('מחיקת ההתקדמות', () => {
         if (r.dataset['sure'] === '1') { onReset(); close(); resolve(); } else { r.dataset['sure'] = '1'; r.textContent = 'ללחוץ שוב לאישור'; }
@@ -177,6 +179,48 @@ export function pickHero(ctx: Ctx): Promise<{ look: Look; name: string } | null>
     const row = h('div', 'lfoot');
     row.append(btn('יאללה', () => { close(); resolve({ look, name: name.value.trim() || 'שליח' }); }, 'btn primary'), btn('חזרה', () => { close(); resolve(null); }, 'btn ghost'));
     card.appendChild(row);
+    root.appendChild(card);
+  });
+}
+
+const MEDAL_HE: Record<string, string> = { gold: 'זהב', silver: 'כסף', bronze: 'ארד', none: 'ללא מדליה' };
+
+/** Collection & progress summary: cars, upgrades, hidden parcels, lessons and race medals. */
+export function openCollection(ctx: Ctx): Promise<void> {
+  const s = ctx.save.data;
+  const { root, close } = overlay('collection-screen');
+  return new Promise((resolve) => {
+    const card = h('div', 'lcard mlist');
+    card.appendChild(h('h2', null, 'אוסף והישגים'));
+    const stats = h('div', 'sidefacts');
+    stats.append(
+      h('span', 'sidefact', `רכבים: ${s.cars.length}/${CARS.length}`),
+      h('span', 'sidefact', `שדרוגים: ${totalUpgrades(s)}`),
+      h('span', 'sidefact', `חבילות נסתרות: ${Object.keys(s.parcels).length}`),
+      h('span', 'sidefact', `מטבעות: ${s.coins}`),
+    );
+    card.appendChild(stats);
+    card.appendChild(h('h3', 'mside-h', 'שיעורים'));
+    for (const id of LESSON_IDS) {
+      const lp = s.lessons[id];
+      const title = LESSONS[id]?.title ?? id;
+      const status = lp?.done ? `הושלם · חידון ${lp.quizBest}/8` : lp?.quizPassed ? `חידון ${lp.quizBest}/8` : 'טרם הושלם';
+      const r = h('div', `mrow${lp?.done ? ' done' : ''}`);
+      r.append(h('b', null, `${lp?.done ? '✓' : '○'} ${title}`), h('span', null, status));
+      card.appendChild(r);
+    }
+    card.appendChild(h('h3', 'mside-h', 'מדליות מרוצים'));
+    const entries = Object.entries(s.races);
+    if (!entries.length) {
+      card.appendChild(h('p', 'sidenote', 'עדיין לא הושלמו מרוצים. חפשו נקודות מרוץ בעיר!'));
+    } else {
+      for (const [rid, rec] of entries) {
+        const r = h('div', 'mrow side done');
+        r.append(h('b', null, rid), h('span', null, `${MEDAL_HE[rec.medal] ?? rec.medal} · שיא ${fmtTime(rec.best)}`));
+        card.appendChild(r);
+      }
+    }
+    card.appendChild(btn('סגירה', () => { close(); resolve(); }, 'btn primary'));
     root.appendChild(card);
   });
 }

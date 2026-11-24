@@ -18,6 +18,7 @@ export interface GameEvents {
   'drive:pickup': { kind: 'coin' | 'parcel' | 'item'; amount: number; item?: ItemId; id?: string };
   'drive:gate': { id: string; right: boolean };
   'drive:position': { x: number; z: number; heading: number };     // ~1 Hz, for saving
+  'drive:fps': number;
   'drive:ready': undefined;
   /** UI -> Drive */
   'drive:start': DriveConfig;
@@ -27,6 +28,10 @@ export interface GameEvents {
   'drive:set-look': CarLook;
   /** the player's car stats changed (another car, an upgrade, new wheels) */
   'drive:set-stats': CarStats;
+  /** update cleaned districts live after finishing a lesson */
+  'drive:set-cleaned': number[];
+  /** switch camera between chase and 3D garage orbit */
+  'drive:camera': 'chase' | 'garage';
   'ui:pause': { paused: boolean };
   'ui:input': DriveInput;
   'ui:clock': { fuel: number };

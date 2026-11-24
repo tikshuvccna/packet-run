@@ -16,6 +16,8 @@ body.modal .hud { visibility: hidden; }
 .missionbox.side { border-color: #b56cff; background: rgba(34, 14, 58, .86); }
 .missionbox.side b { color: #d9b3ff; }
 .missionbox .mnote { color: #ffd0f0; font-size: .74rem; }
+.missionbox .mdist { color: #9bf3ff; font-size: .74rem; font-weight: 800; }
+.fpsbadge { align-self: flex-start; background: rgba(8, 26, 45, .72); color: #9bf3ff; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; padding: 2px 8px; font-size: .72rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .prompt.side { border-color: #b56cff; color: #ecd9ff; background: rgba(34, 14, 58, .92); }
 .bar-fill.car { background: linear-gradient(90deg, #6fb6ff, #bfe0ff); }
 .cargauge { margin-top: -2px; }

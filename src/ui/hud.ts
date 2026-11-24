@@ -24,6 +24,10 @@ export class Hud {
   private mission: MissionView | null = null;
   /** set by the flow: the title of the side mission offered at a place, or null */
   sideOffer: ((poi: string) => string | null) | null = null;
+  /** set by the flow: current objective world coordinates for live distance display */
+  objective: (() => { x: number; z: number } | null) | null = null;
+  private fpsEl: HTMLElement;
+  private distEl: HTMLElement;
   private carFill: HTMLElement;
   private hitEl: HTMLElement;
   private banner: HTMLElement;
@@ -52,7 +56,9 @@ export class Hud {
     const left = h('div', 'hud-left');
     this.raceBox = h('div', 'racebox hidden');
     this.missionBox = h('div', 'missionbox hidden');
-    left.append(this.raceBox, this.missionBox);
+    this.distEl = h('span', 'mdist');
+    this.fpsEl = h('div', 'fpsbadge hidden', '60 FPS');
+    left.append(this.raceBox, this.missionBox, this.fpsEl);
     const right = h('div', 'hud-right');
     const coin = h('div', 'coinpill');
     this.coinText = h('b', null, '0');
@@ -115,6 +121,7 @@ export class Hud {
       bus.on('drive:toast', (t) => this.toast(t.text, t.kind)),
       bus.on('ui:pause', (p) => { if (p.paused) this.setLever(0); }),
       bus.on('ui:clock', (c) => { this.fuelFill.style.width = `${Math.max(0, Math.min(1, c.fuel)) * 100}%`; this.fuelFill.classList.toggle('low', c.fuel < 0.25); }),
+      bus.on('drive:fps', (n) => { this.fpsEl.textContent = `${n} FPS`; }),
     );
     this.send(true);
   }
@@ -122,6 +129,7 @@ export class Hud {
   mount(parent: HTMLElement): void { parent.appendChild(this.root); }
   destroy(): void { this.offs.forEach((o) => o()); this.root.remove(); this.bus.emit('ui:input', { ...NO_INPUT }); }
   setMiniMap(p: MiniMapProvider | null): void { this.mapProvider = p; this.map.classList.toggle('hidden', !p); }
+  setShowFps(on: boolean): void { this.fpsEl.classList.toggle('hidden', !on); }
   /** Current mission step (null hides the box). sec = seconds left of a time limit. */
   setMission(m: MissionView | null): void {
     this.mission = m;
@@ -132,6 +140,7 @@ export class Hud {
     this.missionBox.append(h('b', null, m.title), h('span', null, m.text));
     if (m.note) this.missionBox.appendChild(h('span', 'mnote', m.note));
     if (m.sec !== null) { const t = h('span', 'mtimer', fmtTime(Math.max(0, m.sec)).replace(/\.\d$/, '')); if (m.sec <= 15) t.classList.add('low'); this.missionBox.appendChild(t); }
+    this.missionBox.appendChild(this.distEl);
   }
   setCoins(n: number): void { this.coinText.textContent = String(Math.round(n)); }
 
@@ -169,6 +178,10 @@ export class Hud {
       this.raceBox.classList.add('hidden');
       this.missionBox.classList.toggle('hidden', !this.mission);
       this.banner.classList.add('hidden');
+      if (this.mission) {
+        const obj = this.objective?.();
+        this.distEl.textContent = obj ? `מרחק ליעד: ${Math.round(Math.hypot(obj.x - s.x, obj.z - s.z))} מ׳` : '';
+      }
     }
     if (this.mapProvider) {
       const c = this.map.getContext('2d');

@@ -3,7 +3,7 @@ import { openGarage } from '../ui/garage';
 import { runLessonHub } from '../ui/lessonhub';
 import { say } from '../ui/dialogue';
 import { Hud, type MiniMapProvider } from '../ui/hud';
-import { openCredits, openHelp, openSettings, pickHero, showTitle } from '../ui/menus';
+import { openCollection, openCredits, openHelp, openSettings, pickHero, showTitle } from '../ui/menus';
 import { btn, h, overlay, ui } from '../ui/dom';
 import { LESSON_GARAGE, LESSON_IDS, gatesFor } from '../content';
 import type { DriveConfig, HudState, RaceDef, RaceResult } from '../drive/contract';
@@ -91,7 +91,7 @@ export class Flow {
         settings: () => openSettings(this.ctx, () => { this.ctx.save.reset(); }),
         help: () => openHelp(this.ctx),
         credits: () => openCredits(this.ctx),
-        codex: () => openGarage(this.ctx),
+        codex: () => openCollection(this.ctx),
       });
       if (choice === 'new') {
         const hero = await pickHero(this.ctx);
@@ -123,6 +123,8 @@ export class Flow {
     const hud = new Hud(bus, () => { void this.pauseMenu().then((leave) => { if (leave) finish(); }); });
     this.hud = hud;
     hud.sideOffer = (poi) => sideOfferAt(this.s, poi)?.title ?? null;
+    hud.objective = () => this.objective();
+    hud.setShowFps(this.s.settings.showFps);
     hud.mount(ui());
     hud.setCoins(this.s.coins);
     if (this.city?.minimap) hud.setMiniMap(this.city.minimap);
@@ -130,8 +132,16 @@ export class Flow {
     this.warned = false;
     return new Promise<void>((resolve) => {
       const clock = window.setInterval(() => { if (!this.inModal && !this.paused) this.tick(); }, 1000);
+      const onEsc = (e: KeyboardEvent): void => {
+        if (e.code === 'Escape' && !e.repeat && !this.inModal && !this.paused) {
+          e.preventDefault();
+          void this.pauseMenu().then((leave) => { if (leave) finish(); });
+        }
+      };
+      window.addEventListener('keydown', onEsc);
       finish = (): void => {
         window.clearInterval(clock);
+        window.removeEventListener('keydown', onEsc);
         this.offs.forEach((f) => f());
         this.offs = [];
         hud.destroy();
@@ -351,9 +361,7 @@ export class Flow {
     if (!lesson) return;
     const poi = this.city?.poiPos(this.city.lessonPoi(lesson));
     if (poi) this.ctx.bus.emit('drive:teleport', poi);
-    this.inModal = true;
-    await say(this.ctx, ['g.02', 'g.03']);
-    this.inModal = false;
+    await this.modal(() => say(this.ctx, ['g.02', 'g.03']));
     await this.visitLesson(lesson);
   }
 
@@ -367,7 +375,12 @@ export class Flow {
       await this.visitLesson(e.lesson);
     } else if (e.kind === 'garage' || e.kind === 'shop') {
       this.ctx.bus.emit('drive:repair', undefined);
-      await this.modal(() => openGarage(this.ctx, e.kind === 'garage' ? 'cars' : 'upgrades'));
+      this.ctx.bus.emit('drive:camera', 'garage');
+      try {
+        await this.modal(() => openGarage(this.ctx, e.kind === 'garage' ? 'cars' : 'upgrades'));
+      } finally {
+        this.ctx.bus.emit('drive:camera', 'chase');
+      }
       this.syncCar();
       const st = currentStep(this.s);
       if (st && st.t === 'visit' && st.poi === e.id) { this.stepDone(true); void this.enterStep(); }
@@ -383,7 +396,11 @@ export class Flow {
   private async visitLesson(lessonId: string): Promise<void> {
     const wasDone = !!this.s.lessons[lessonId]?.done;
     await this.modal(async () => { await runLessonHub(this.ctx, lessonId); });
-    if (!wasDone && this.s.lessons[lessonId]?.done) { this.driveSec = 0; this.warned = false; this.ctx.bus.emit('ui:clock', { fuel: 1 }); }
+    if (!wasDone && this.s.lessons[lessonId]?.done) {
+      this.driveSec = 0; this.warned = false;
+      this.ctx.bus.emit('ui:clock', { fuel: 1 });
+      this.ctx.bus.emit('drive:set-cleaned', cleanedDistricts(this.s));
+    }
     this.syncCar();
     this.hud?.setCoins(this.s.coins);
     this.ctx.audio.mood('city');
@@ -415,10 +432,10 @@ export class Flow {
     this.raceCoins = 0;
     if (r.raceId === 'grandprix' && r.place === 1 && !this.s.bossWon) {
       this.s.bossWon = true; this.ctx.save.save();
-      this.inModal = true;
-      await say(this.ctx, ['w.01', 'w.02', 'w.03', 'w.04']);
-      await openCredits(this.ctx);
-      this.inModal = false;
+      await this.modal(async () => {
+        await say(this.ctx, ['w.01', 'w.02', 'w.03', 'w.04']);
+        await openCredits(this.ctx);
+      });
     }
     const st = currentStep(this.s);
     if (st && st.t === 'race' && st.race === r.raceId && (!st.win || r.place === 1)) { this.stepDone(true); void this.enterStep(); }
@@ -470,7 +487,8 @@ export class Flow {
       col.append(
         btn('המשך', () => { close(); resolve(false); }, 'btn primary big'),
         btn('משימות', () => { void this.openMissions(); }, 'btn'),
-        btn('הגדרות', () => { void openSettings(this.ctx); }, 'btn'),
+        btn('אוסף ומדליות', () => { void openCollection(this.ctx); }, 'btn'),
+        btn('הגדרות', () => { void openSettings(this.ctx).then(() => { this.hud?.setShowFps(this.s.settings.showFps); }); }, 'btn'),
         btn('עזרה', () => { void openHelp(this.ctx); }, 'btn'),
         btn('קרדיטים', () => { void openCredits(this.ctx); }, 'btn'),
         btn('לתפריט הראשי', () => { close(); resolve(true); }, 'btn ghost'),
